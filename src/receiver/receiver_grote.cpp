@@ -1,3 +1,15 @@
+//  Copyright (c) 2025 Sam Martin, Nirajan Koirala, Helena Berens, Micah Brody, Taeho Jung
+//
+//  Licensed under the MIT License (the "License"); you may not use this file
+//  except in compliance with the License.
+//
+//  You may obtain a copy of the License in the LICENSE file at the project
+//  root or at
+//
+//  https://mit-license.org/
+//
+//  SPDX-License-Identifier: MIT
+
 #include "../../include/receiver_grote.h"
 
 // implementation of functions declared in receiver_grote.h
@@ -5,11 +17,12 @@
 // -------------------- CONSTRUCTOR --------------------
 
 GroteReceiver::GroteReceiver(CryptoContext<DCRTPoly> ccParam,
-                         PublicKey<DCRTPoly> pkParam, PrivateKey<DCRTPoly> skParam, size_t vectorParam)
+                             PublicKey<DCRTPoly> pkParam, PrivateKey<DCRTPoly> skParam, size_t vectorParam)
     : BaseReceiver(ccParam, pkParam, skParam, vectorParam) {}
 
 // -------------------- PUBLIC FUNCTIONS --------------------
-vector<size_t> GroteReceiver::decryptIndex(vector<Ciphertext<DCRTPoly>> &indexCipher) {
+vector<size_t> GroteReceiver::decryptIndex(vector<Ciphertext<DCRTPoly>> &indexCipher)
+{
   // row length is the power of 2 closest to sqrt(batchSize)
   // dividing scores into square matrix as close as possible
   size_t batchSize = cc->GetEncodingParams()->GetBatchSize();
@@ -19,12 +32,12 @@ vector<size_t> GroteReceiver::decryptIndex(vector<Ciphertext<DCRTPoly>> &indexCi
   // copy row and column scores from combined vector
   size_t numRowCiphers = ceil(double(ceil(double(numVectors) / double(batchSize))) / double(rowLength));
   size_t numColCiphers = ceil(double(ceil(double(numVectors) / double(batchSize))) / double(colLength));
-  if (numRowCiphers + numColCiphers != indexCipher.size()) {
+  if (numRowCiphers + numColCiphers != indexCipher.size())
+  {
     cerr << "Error: incorrect parsing of index query results" << endl;
   }
   vector<Ciphertext<DCRTPoly>> rowCipher(indexCipher.begin(), indexCipher.begin() + numRowCiphers);
   vector<Ciphertext<DCRTPoly>> colCipher(indexCipher.begin() + numRowCiphers, indexCipher.end());
-
 
   // decrypt results
   vector<double> rowVals = OpenFHEWrapper::decryptVectorToVector(cc, sk, rowCipher);
@@ -34,30 +47,36 @@ vector<size_t> GroteReceiver::decryptIndex(vector<Ciphertext<DCRTPoly>> &indexCi
   vector<size_t> colMatches;
   vector<size_t> matchIndices;
 
-  for(size_t i = 0; i < rowVals.size(); i++) {
-    if(rowVals[i] >= 1.0) {
+  for (size_t i = 0; i < rowVals.size(); i++)
+  {
+    if (rowVals[i] >= 1.0)
+    {
       rowMatches.push_back(i);
     }
   }
 
-  for(size_t i = 0; i < colVals.size(); i++) {
-    if(colVals[i] >= 1.0) {
+  for (size_t i = 0; i < colVals.size(); i++)
+  {
+    if (colVals[i] >= 1.0)
+    {
       colMatches.push_back(i);
     }
   }
 
   size_t rowMatrixNum;
   size_t colMatrixNum;
-  for(size_t i = 0; i < rowMatches.size(); i++) {
+  for (size_t i = 0; i < rowMatches.size(); i++)
+  {
     rowMatrixNum = rowMatches[i] / colLength;
 
-    for(size_t j = 0; j < colMatches.size(); j++) {
+    for (size_t j = 0; j < colMatches.size(); j++)
+    {
       colMatrixNum = colMatches[j] / rowLength;
-      
-      if(rowMatrixNum == colMatrixNum) {
+
+      if (rowMatrixNum == colMatrixNum)
+      {
         matchIndices.push_back((rowMatches[i] * rowLength) + (colMatches[j] % rowLength));
       }
-
     }
   }
 

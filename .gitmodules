@@ -1,0 +1,3 @@
+[submodule "FIDESlib"]
+	path = FIDESlib
+	url = ../fideslib.git

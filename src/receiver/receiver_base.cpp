@@ -1,3 +1,15 @@
+//  Copyright (c) 2025 Sam Martin, Nirajan Koirala, Helena Berens, Micah Brody, Taeho Jung
+//
+//  Licensed under the MIT License (the "License"); you may not use this file
+//  except in compliance with the License.
+//
+//  You may obtain a copy of the License in the LICENSE file at the project
+//  root or at
+//
+//  https://mit-license.org/
+//
+//  SPDX-License-Identifier: MIT
+
 #include "../../include/receiver_base.h"
 
 // implementation of functions declared in receiver_base.h
@@ -5,18 +17,20 @@
 // -------------------- CONSTRUCTOR --------------------
 
 BaseReceiver::BaseReceiver(CryptoContext<DCRTPoly> ccParam,
-                         PublicKey<DCRTPoly> pkParam, PrivateKey<DCRTPoly> skParam, size_t vectorParam)
+                           PublicKey<DCRTPoly> pkParam, PrivateKey<DCRTPoly> skParam, size_t vectorParam)
     : HersReceiver(ccParam, pkParam, skParam, vectorParam) {}
 
 // -------------------- PUBLIC FUNCTIONS --------------------
 
-vector<Ciphertext<DCRTPoly>> BaseReceiver::encryptQuery(vector<double> query) {
-  
+vector<Ciphertext<DCRTPoly>> BaseReceiver::encryptQuery(vector<double> query)
+{
+
   size_t batchSize = cc->GetEncodingParams()->GetBatchSize();
 
   query = VectorUtils::plaintextNormalize(query, VECTOR_DIM);
   vector<double> queryBatch(batchSize);
-  for(size_t i = 0; i < batchSize; i += VECTOR_DIM) {
+  for (size_t i = 0; i < batchSize; i += VECTOR_DIM)
+  {
     copy(query.begin(), query.end(), queryBatch.begin() + i);
   }
 

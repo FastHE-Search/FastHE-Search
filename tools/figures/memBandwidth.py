@@ -1,5 +1,17 @@
 #!/usr/bin/env python3
 
+#  Copyright (c) 2025 Sam Martin, Nirajan Koirala, Helena Berens, Micah Brody, Taeho Jung
+#
+#  Licensed under the MIT License (the "License"); you may not use this file
+#  except in compliance with the License.
+#
+#  You may obtain a copy of the License in the LICENSE file at the project
+#  root or at
+#
+#  https://mit-license.org/
+#
+#  SPDX-License-Identifier: MIT
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -19,23 +31,28 @@ bandwidths = ["64Kbps", "2Mbps", "1Gbps", "20Gbps"]
 fig, ax = plt.subplots(figsize=(8, 5))
 
 # Plotting
-ax.plot(network, dfMem["Baseline"].values, marker='o', linestyle='-', label='Baseline')
-ax.plot(network, dfMem["GROTE"].values, marker='s', linestyle='--', label='GROTE')
-ax.plot(network, dfMem["Blind-Match"].values, marker='*', linestyle='-', label='Blind-Match')
-ax.plot(network, dfMem["HERS"].values, marker='^', linestyle='--', label='HERS')
-ax.plot(network, dfMem["Ours"].values, marker='v', linestyle='-', label='Ours')
+ax.plot(network, dfMem["Baseline"].values, marker="o", linestyle="-", label="Baseline")
+ax.plot(network, dfMem["GROTE"].values, marker="s", linestyle="--", label="GROTE")
+ax.plot(
+    network, dfMem["Blind-Match"].values, marker="*", linestyle="-", label="Blind-Match"
+)
+ax.plot(network, dfMem["HERS"].values, marker="^", linestyle="--", label="HERS")
+ax.plot(network, dfMem["Ours"].values, marker="v", linestyle="-", label="Ours")
 
 # Formatting
-#ax.set_xscale('log', base=2)
-ax.set_yscale('log')
+# ax.set_xscale('log', base=2)
+ax.set_yscale("log")
 ax.set_xticklabels(bandwidths)  # Proper exponent notation
 ax.set_xlabel("Network Bandwidth", fontsize=18)
 ax.set_ylabel("End-To-End Query Time (seconds)", fontsize=18)
-ax.set_title("Membership Scenario End-to-End Overhead\nover $2^{15}$ Database Subjects", fontsize=18)
+ax.set_title(
+    "Membership Scenario End-to-End Overhead\nover $2^{15}$ Database Subjects",
+    fontsize=18,
+)
 ax.grid(True, which="both", linestyle="--", linewidth=0.5)
 ax.legend(fontsize=16)
 
-plt.tick_params(axis='both', labelsize=16)
+plt.tick_params(axis="both", labelsize=16)
 
 # Save as PDF
 pdf_filename = "/tmp/manuscript_figures/membershipBandwidthLarge.pdf"

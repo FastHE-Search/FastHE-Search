@@ -1,3 +1,15 @@
+//  Copyright (c) 2025 Sam Martin, Nirajan Koirala, Helena Berens, Micah Brody, Taeho Jung
+//
+//  Licensed under the MIT License (the "License"); you may not use this file
+//  except in compliance with the License.
+//
+//  You may obtain a copy of the License in the LICENSE file at the project
+//  root or at
+//
+//  https://mit-license.org/
+//
+//  SPDX-License-Identifier: MIT
+
 // ** receiver: Defines the abstract class for receiver (querier) functionality
 
 #pragma once
@@ -14,23 +26,24 @@
 using namespace lbcrypto;
 using namespace std;
 
-class Receiver {
+class Receiver
+{
 public:
   // constructor
   Receiver(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam,
-              PrivateKey<DCRTPoly> skParam, size_t vectorParam);
+           PrivateKey<DCRTPoly> skParam, size_t vectorParam);
 
   // destructor
   virtual ~Receiver() = default;
 
   // virtual methods -- to be overridden by derived receiver classes
-  virtual vector<Ciphertext<DCRTPoly>> 
+  virtual vector<Ciphertext<DCRTPoly>>
   encryptQuery(vector<double> query) = 0;
 
-  virtual bool 
+  virtual bool
   decryptMembership(Ciphertext<DCRTPoly> &membershipCipher) = 0;
 
-  virtual vector<size_t> 
+  virtual vector<size_t>
   decryptIndex(vector<Ciphertext<DCRTPoly>> &indexCipher) = 0;
 
 protected:
@@ -39,5 +52,4 @@ protected:
   PublicKey<DCRTPoly> pk;
   PrivateKey<DCRTPoly> sk;
   size_t numVectors;
-
 };

@@ -1,5 +1,17 @@
 #!/usr/bin/env python3
 
+#  Copyright (c) 2025 Sam Martin, Nirajan Koirala, Helena Berens, Micah Brody, Taeho Jung
+#
+#  Licensed under the MIT License (the "License"); you may not use this file
+#  except in compliance with the License.
+#
+#  You may obtain a copy of the License in the LICENSE file at the project
+#  root or at
+#
+#  https://mit-license.org/
+#
+#  SPDX-License-Identifier: MIT
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -21,24 +33,56 @@ x_ticks = [2**i for i in range(10, 21)]  # 2^10 to 2^20
 fig, ax = plt.subplots(figsize=(8, 5))
 
 # Plotting
-ax.plot(db, df1["Average Index Computation (seconds)"].values, marker='o', linestyle='-', label='Baseline')
-ax.plot(db, df2["Average Index Computation (seconds)"].values, marker='s', linestyle='--', label='GROTE')
-ax.plot(db, df3["Average Index Computation (seconds)"].values, marker='*', linestyle='-', label='Blind-Match')
-ax.plot(db, df4["Average Index Computation (seconds)"].values, marker='^', linestyle='--', label='HERS')
-ax.plot(db, df5["Average Index Computation (seconds)"].values, marker='v', linestyle='-', label='Ours')
+ax.plot(
+    db,
+    df1["Average Index Computation (seconds)"].values,
+    marker="o",
+    linestyle="-",
+    label="Baseline",
+)
+ax.plot(
+    db,
+    df2["Average Index Computation (seconds)"].values,
+    marker="s",
+    linestyle="--",
+    label="GROTE",
+)
+ax.plot(
+    db,
+    df3["Average Index Computation (seconds)"].values,
+    marker="*",
+    linestyle="-",
+    label="Blind-Match",
+)
+ax.plot(
+    db,
+    df4["Average Index Computation (seconds)"].values,
+    marker="^",
+    linestyle="--",
+    label="HERS",
+)
+ax.plot(
+    db,
+    df5["Average Index Computation (seconds)"].values,
+    marker="v",
+    linestyle="-",
+    label="Ours",
+)
 
 # Formatting
-ax.set_xscale('log', base=2)
-ax.set_yscale('log')
+ax.set_xscale("log", base=2)
+ax.set_yscale("log")
 ax.set_xticks(x_ticks)
-ax.set_xticklabels([f"$2^{{{int(np.log2(x))}}}$" for x in x_ticks])  # Proper exponent notation
+ax.set_xticklabels(
+    [f"$2^{{{int(np.log2(x))}}}$" for x in x_ticks]
+)  # Proper exponent notation
 ax.set_xlabel("Database Size", fontsize=18)
 ax.set_ylabel("Server Computation Time (seconds)", fontsize=18)
 ax.set_title("Identification Scenario\nServer Overhead", fontsize=18)
 ax.grid(True, which="both", linestyle="--", linewidth=0.5)
 ax.legend(fontsize=14)
 
-plt.tick_params(axis='both', labelsize=16)
+plt.tick_params(axis="both", labelsize=16)
 
 # Save as PDF
 pdf_filename = "/tmp/manuscript_figures/identificationScalabilityLarge.pdf"

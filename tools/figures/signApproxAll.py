@@ -1,5 +1,17 @@
 #!/usr/bin/env python3
 
+#  Copyright (c) 2025 Sam Martin, Nirajan Koirala, Helena Berens, Micah Brody, Taeho Jung
+#
+#  Licensed under the MIT License (the "License"); you may not use this file
+#  except in compliance with the License.
+#
+#  You may obtain a copy of the License in the LICENSE file at the project
+#  root or at
+#
+#  https://mit-license.org/
+#
+#  SPDX-License-Identifier: MIT
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -11,28 +23,28 @@ df = pd.read_csv("./tools/figures/signApprox.csv")
 db = df["input"].values
 
 # Define x-ticks with powers of 2 up to 2^20
-#x_ticks = [2**i for i in range(10, 21)]  # 2^10 to 2^20
+# x_ticks = [2**i for i in range(10, 21)]  # 2^10 to 2^20
 
 # Create figure and axis
 fig, ax = plt.subplots(figsize=(6, 3))
 
 # Plotting
 
-ax.plot(db, (df["cheon"]+1).values, linestyle='-', label='Cheon et al.')
-ax.plot(db, (df["chebyshev"]+1).values, linestyle='-', label='Chebyshev')
-ax.plot(db, df["combined"].values, linestyle='-', label='Ours')
+ax.plot(db, (df["cheon"] + 1).values, linestyle="-", label="Cheon et al.")
+ax.plot(db, (df["chebyshev"] + 1).values, linestyle="-", label="Chebyshev")
+ax.plot(db, df["combined"].values, linestyle="-", label="Ours")
 
 # Formatting
 ax.legend(fontsize=10)
 
 # Remove top and right borders
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
-ax.spines['bottom'].set_position(('data', 0))
-ax.spines['left'].set_position(('data', 0))
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+ax.spines["bottom"].set_position(("data", 0))
+ax.spines["left"].set_position(("data", 0))
 
-ax.spines['left'].set_bounds(0, 2)
-ax.spines['bottom'].set_bounds(-1, 1)
+ax.spines["left"].set_bounds(0, 2)
+ax.spines["bottom"].set_bounds(-1, 1)
 ax.margins(y=0)
 
 # Set axis limits

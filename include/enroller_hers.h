@@ -1,3 +1,15 @@
+//  Copyright (c) 2025 Sam Martin, Nirajan Koirala, Helena Berens, Micah Brody, Taeho Jung
+//
+//  Licensed under the MIT License (the "License"); you may not use this file
+//  except in compliance with the License.
+//
+//  You may obtain a copy of the License in the LICENSE file at the project
+//  root or at
+//
+//  https://mit-license.org/
+//
+//  SPDX-License-Identifier: MIT
+
 // ** enroller: class for encrypting and/or serializing all database vectors
 // done according to our current fastest approach
 
@@ -13,7 +25,8 @@
 using namespace lbcrypto;
 using namespace std;
 
-class HersEnroller {
+class HersEnroller
+{
 public:
   // constructor
   HersEnroller(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
@@ -22,7 +35,6 @@ public:
   vector<vector<Ciphertext<DCRTPoly>>> encryptDB(vector<vector<double>> &database);
 
   void serializeDB(vector<vector<double>> &database);
-
 
 protected:
   // private members

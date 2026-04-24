@@ -1,3 +1,15 @@
+//  Copyright (c) 2025 Sam Martin, Nirajan Koirala, Helena Berens, Micah Brody, Taeho Jung
+//
+//  Licensed under the MIT License (the "License"); you may not use this file
+//  except in compliance with the License.
+//
+//  You may obtain a copy of the License in the LICENSE file at the project
+//  root or at
+//
+//  https://mit-license.org/
+//
+//  SPDX-License-Identifier: MIT
+
 #include "../../include/sender_grote.h"
 
 // implementation of functions declared in sender_grote.h
@@ -5,28 +17,30 @@
 // -------------------- CONSTRUCTOR --------------------
 
 GroteSender::GroteSender(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam,
-               size_t vectorParam)
+                         size_t vectorParam)
     : BaseSender(ccParam, pkParam, vectorParam) {}
 
 // -------------------- PUBLIC FUNCTIONS --------------------
 
-Ciphertext<DCRTPoly> GroteSender::membershipScenario(vector<Ciphertext<DCRTPoly>> &queryCipher) {
+Ciphertext<DCRTPoly> GroteSender::membershipScenario(vector<Ciphertext<DCRTPoly>> &queryCipher)
+{
 
   // row length is the power of 2 closest to sqrt(batchSize)
   // dividing scores into square matrix as close as possible
   size_t batchSize = cc->GetEncodingParams()->GetBatchSize();
   size_t rowLength = pow(2.0, ceil(log2(batchSize) / 2.0));
 
-    // compute similarity scores between query and database
+  // compute similarity scores between query and database
   vector<Ciphertext<DCRTPoly>> scoreCipher = computeSimilarity(queryCipher);
-  
+
   vector<Ciphertext<DCRTPoly>> colCipher = alphaNormColumns(scoreCipher, ALPHA_DEPTH, rowLength);
 
-  #pragma omp parallel for num_threads(MAX_NUM_CORES)
-  for(size_t i = 0; i < scoreCipher.size(); i++) {
+#pragma omp parallel for num_threads(MAX_NUM_CORES)
+  for (size_t i = 0; i < scoreCipher.size(); i++)
+  {
     scoreCipher[i] = OpenFHEWrapper::chebyshevCompare(cc, scoreCipher[i], MATCH_THRESHOLD, COMP_DEPTH);
   }
-  
+
   // sum up all values into single result value at first slot of first cipher
   Ciphertext<DCRTPoly> membershipCipher = cc->EvalAddManyInPlace(scoreCipher);
   membershipCipher = cc->EvalSum(membershipCipher, cc->GetEncodingParams()->GetBatchSize());
@@ -35,14 +49,15 @@ Ciphertext<DCRTPoly> GroteSender::membershipScenario(vector<Ciphertext<DCRTPoly>
   return membershipCipher;
 }
 
-vector<Ciphertext<DCRTPoly>> 
-GroteSender::indexScenario(vector<Ciphertext<DCRTPoly>> &queryCipher) {
+vector<Ciphertext<DCRTPoly>>
+GroteSender::indexScenario(vector<Ciphertext<DCRTPoly>> &queryCipher)
+{
 
   // row length is the power of 2 closest to sqrt(batchSize)
   // dividing scores into square matrix as close as possible
   size_t batchSize = cc->GetEncodingParams()->GetBatchSize();
   size_t rowLength = pow(2.0, ceil(log2(batchSize) / 2.0));
-  
+
   // compute similarity scores between query and database
   vector<Ciphertext<DCRTPoly>> scoreCipher = computeSimilarity(queryCipher);
 
@@ -53,17 +68,20 @@ GroteSender::indexScenario(vector<Ciphertext<DCRTPoly>> &queryCipher) {
 
   // since we are squaring score values ALPHA_DEPTH times, we must do the same for the comparison threshold
   double adjustedThreshold = MATCH_THRESHOLD;
-  for(size_t a = 0; a < ALPHA_DEPTH; a++) {
+  for (size_t a = 0; a < ALPHA_DEPTH; a++)
+  {
     adjustedThreshold = adjustedThreshold * adjustedThreshold;
   }
 
-  #pragma omp parallel for num_threads(MAX_NUM_CORES)
-  for(size_t i = 0; i < rowCipher.size(); i++) {
+#pragma omp parallel for num_threads(MAX_NUM_CORES)
+  for (size_t i = 0; i < rowCipher.size(); i++)
+  {
     rowCipher[i] = OpenFHEWrapper::chebyshevCompare(cc, rowCipher[i], adjustedThreshold, COMP_DEPTH);
   }
 
-  #pragma omp parallel for num_threads(MAX_NUM_CORES)
-  for(size_t i = 0; i < colCipher.size(); i++) {
+#pragma omp parallel for num_threads(MAX_NUM_CORES)
+  for (size_t i = 0; i < colCipher.size(); i++)
+  {
     colCipher[i] = OpenFHEWrapper::chebyshevCompare(cc, colCipher[i], adjustedThreshold, COMP_DEPTH);
   }
 

@@ -1,3 +1,15 @@
+//  Copyright (c) 2025 Sam Martin, Nirajan Koirala, Helena Berens, Micah Brody, Taeho Jung
+//
+//  Licensed under the MIT License (the "License"); you may not use this file
+//  except in compliance with the License.
+//
+//  You may obtain a copy of the License in the LICENSE file at the project
+//  root or at
+//
+//  https://mit-license.org/
+//
+//  SPDX-License-Identifier: MIT
+
 #include "../../include/sender_diag.h"
 
 // implementation of functions declared in sender_diag.h
@@ -5,11 +17,12 @@
 // -------------------- CONSTRUCTOR --------------------
 
 DiagonalSender::DiagonalSender(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam,
-               size_t vectorParam)
+                               size_t vectorParam)
     : HersSender(ccParam, pkParam, vectorParam) {}
 
 // -------------------- PUBLIC FUNCTIONS --------------------
-vector<Ciphertext<DCRTPoly>> DiagonalSender::computeSimilarity(vector<Ciphertext<DCRTPoly>> &queryCipher) {
+vector<Ciphertext<DCRTPoly>> DiagonalSender::computeSimilarity(vector<Ciphertext<DCRTPoly>> &queryCipher)
+{
 
   size_t batchSize = cc->GetEncodingParams()->GetBatchSize();
   size_t cyclotomicOrder = 2 * cc->GetRingDimension(); // needed for fast hoisted rotations
@@ -20,28 +33,32 @@ vector<Ciphertext<DCRTPoly>> DiagonalSender::computeSimilarity(vector<Ciphertext
   vector<Ciphertext<DCRTPoly>> rotatedQueryCipher(VECTOR_DIM);
   rotatedQueryCipher[0] = queryCipher[0];
   shared_ptr<vector<DCRTPoly>> queryPrecomp = cc->EvalFastRotationPrecompute(queryCipher[0]); // needed for fast hoisted rotations
-  #pragma omp parallel for num_threads(MAX_NUM_CORES)
-  for(size_t i = 1; i < VECTOR_DIM; i++) {
+#pragma omp parallel for num_threads(MAX_NUM_CORES)
+  for (size_t i = 1; i < VECTOR_DIM; i++)
+  {
     rotatedQueryCipher[i] = cc->EvalFastRotation(queryCipher[0], i, cyclotomicOrder, queryPrecomp);
   }
 
-  for(size_t m = 0; m < numMatrices; m++) {
+  for (size_t m = 0; m < numMatrices; m++)
+  {
     similarityCipher[m] = computeSimilarityMatrix(rotatedQueryCipher, m);
   }
 
   return similarityCipher;
 }
 
-Ciphertext<DCRTPoly> DiagonalSender::membershipScenario(vector<Ciphertext<DCRTPoly>> &queryCipher) {
+Ciphertext<DCRTPoly> DiagonalSender::membershipScenario(vector<Ciphertext<DCRTPoly>> &queryCipher)
+{
 
   // compute similarity scores between query and database
   vector<Ciphertext<DCRTPoly>> scoreCipher = computeSimilarity(queryCipher);
-  
-  #pragma omp parallel for num_threads(MAX_NUM_CORES)
-  for(size_t i = 0; i < scoreCipher.size(); i++) {
+
+#pragma omp parallel for num_threads(MAX_NUM_CORES)
+  for (size_t i = 0; i < scoreCipher.size(); i++)
+  {
     scoreCipher[i] = OpenFHEWrapper::chebyshevCompare(cc, scoreCipher[i], MATCH_THRESHOLD, COMP_DEPTH);
   }
-  
+
   // sum up all values into single result value at first slot of first cipher
   Ciphertext<DCRTPoly> membershipCipher = cc->EvalAddManyInPlace(scoreCipher);
   membershipCipher = cc->EvalSum(membershipCipher, cc->GetEncodingParams()->GetBatchSize());
@@ -49,30 +66,35 @@ Ciphertext<DCRTPoly> DiagonalSender::membershipScenario(vector<Ciphertext<DCRTPo
   return membershipCipher;
 }
 
-vector<Ciphertext<DCRTPoly>> DiagonalSender::indexScenario(vector<Ciphertext<DCRTPoly>> &queryCipher) {
+vector<Ciphertext<DCRTPoly>> DiagonalSender::indexScenario(vector<Ciphertext<DCRTPoly>> &queryCipher)
+{
 
   // compute similarity scores between query and database
   vector<Ciphertext<DCRTPoly>> scoreCipher = computeSimilarity(queryCipher);
-  
-  #pragma omp parallel for num_threads(MAX_NUM_CORES)
-  for(size_t i = 0; i < scoreCipher.size(); i++) {
+
+#pragma omp parallel for num_threads(MAX_NUM_CORES)
+  for (size_t i = 0; i < scoreCipher.size(); i++)
+  {
     scoreCipher[i] = OpenFHEWrapper::chebyshevCompare(cc, scoreCipher[i], MATCH_THRESHOLD, COMP_DEPTH);
   }
-  
+
   return scoreCipher;
 }
 
 // -------------------- PROTECTED FUNCTIONS --------------------
-Ciphertext<DCRTPoly> DiagonalSender::computeSimilarityMatrix(vector<Ciphertext<DCRTPoly>> &queryCipher, size_t matrix) {
+Ciphertext<DCRTPoly> DiagonalSender::computeSimilarityMatrix(vector<Ciphertext<DCRTPoly>> &queryCipher, size_t matrix)
+{
 
   vector<Ciphertext<DCRTPoly>> scoreCipher(VECTOR_DIM);
 
-  #pragma omp parallel for num_threads(MAX_NUM_CORES)
-  for(size_t i = 0; i < VECTOR_DIM; i++) {
+#pragma omp parallel for num_threads(MAX_NUM_CORES)
+  for (size_t i = 0; i < VECTOR_DIM; i++)
+  {
     scoreCipher[i] = computeSimilarityThread(queryCipher[i], matrix, i);
   }
 
-  for(size_t i = 1; i < VECTOR_DIM; i++) {
+  for (size_t i = 1; i < VECTOR_DIM; i++)
+  {
     cc->EvalAddInPlace(scoreCipher[0], scoreCipher[i]);
   }
 
@@ -82,11 +104,13 @@ Ciphertext<DCRTPoly> DiagonalSender::computeSimilarityMatrix(vector<Ciphertext<D
   return scoreCipher[0];
 }
 
-Ciphertext<DCRTPoly> DiagonalSender::computeSimilarityThread(Ciphertext<DCRTPoly> &queryCipher, size_t matrix, size_t index) {
+Ciphertext<DCRTPoly> DiagonalSender::computeSimilarityThread(Ciphertext<DCRTPoly> &queryCipher, size_t matrix, size_t index)
+{
 
   string filepath = "serial/db_diagonal/index" + to_string(matrix * VECTOR_DIM + index) + ".bin";
   Ciphertext<DCRTPoly> databaseCipher;
-  if (Serial::DeserializeFromFile(filepath, databaseCipher, SerType::BINARY) == false) {
+  if (Serial::DeserializeFromFile(filepath, databaseCipher, SerType::BINARY) == false)
+  {
     cerr << "Error: cannot deserialize from \"" << filepath << "\"" << endl;
   }
 
