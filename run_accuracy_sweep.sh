@@ -1,3 +1,5 @@
+#!/bin/bash
+
 #  Copyright (c) 2026 LG Electronics, Inc.
 #
 #  Licensed under the MIT License (the "License"); you may not use this file
@@ -10,7 +12,6 @@
 #
 #  SPDX-License-Identifier: MIT
 
-#!/bin/bash
 # Accuracy sweep: approaches {6, 8} × comp_depth {8, 10}, queries 0–49
 # The serial/ folder is cleaned up automatically at the end of each run,
 # so each combination starts fresh with the correct parameters.

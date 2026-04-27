@@ -1,3 +1,5 @@
+#!/bin/bash
+
 #  Copyright (c) 2026 LG Electronics, Inc.
 #
 #  Licensed under the MIT License (the "License"); you may not use this file
@@ -10,7 +12,6 @@
 #
 #  SPDX-License-Identifier: MIT
 
-#!/bin/bash
 # HyDia Build Script - Choose CPU or GPU mode
 # This script makes it easy to switch between OpenFHE versions
 

@@ -1,3 +1,5 @@
+#!/bin/bash
+
 #  Copyright (c) 2026 LG Electronics, Inc.
 #
 #  Licensed under the MIT License (the "License"); you may not use this file
@@ -10,7 +12,6 @@
 #
 #  SPDX-License-Identifier: MIT
 
-#!/bin/bash
 # Benchmark runner script for light-hydia
 # Runs benchmark.sh with fixed campaign settings and writes filtered logs.
 

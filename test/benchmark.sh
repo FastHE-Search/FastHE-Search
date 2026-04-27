@@ -1,3 +1,5 @@
+#!/bin/bash
+
 #  Copyright (c) 2026 LG Electronics, Inc.
 #
 #  Licensed under the MIT License (the "License"); you may not use this file
@@ -10,7 +12,6 @@
 #
 #  SPDX-License-Identifier: MIT
 
-#!/bin/bash
 
 # Benchmark script for HyDia - runs benchmarks for CPU and/or GPU builds
 #
