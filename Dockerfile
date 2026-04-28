@@ -46,9 +46,9 @@ RUN git clone --depth 1 --branch ${OFHE_VERSION} \
 # 3. Project source (C++ build)
 # -------------------------------------------------
 WORKDIR /opt
-COPY . /opt/image_matching
+COPY --exclude=build --exclude=./venv . /opt/image_matching
 
-RUN mkdir /opt/image_matching/build && \
+RUN mkdir -p /opt/image_matching/build && \
     cd /opt/image_matching/build && \
     cmake .. && \
     make -j$(nproc)
