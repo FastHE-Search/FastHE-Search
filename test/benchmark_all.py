@@ -405,6 +405,35 @@ def clean_serial_db_only():
                 path.unlink(missing_ok=True)
 
 
+def serial_signature_path():
+    return BUILD_DIR / "serial" / ".benchmark_signature"
+
+
+def get_serial_signature(approach):
+    """Return a conservative compatibility signature for serialized artifacts."""
+    return f"approach={approach}"
+
+
+def read_serial_signature():
+    signature_file = serial_signature_path()
+    if not signature_file.exists():
+        return None
+    try:
+        return signature_file.read_text().strip() or None
+    except OSError:
+        return None
+
+
+def write_serial_signature(signature):
+    serial_dir = BUILD_DIR / "serial"
+    if not serial_dir.exists():
+        return
+    try:
+        serial_signature_path().write_text(f"{signature}\n")
+    except OSError:
+        pass
+
+
 def serial_keep_marker_path():
     return BUILD_DIR / ".keep_serial"
 
@@ -443,6 +472,7 @@ def run_benchmark(approach, expected_indices, mult_depth=None, scale_factor=None
     clean_serial_before_run = env_flag_enabled("CLEAN_SERIAL", default=True)
     keep_serial_after_run = env_flag_enabled("KEEP_SERIAL", default=False)
     reuse_keys_only = env_flag_enabled("REUSE_KEYS_ONLY", default=False)
+    serial_signature = get_serial_signature(approach)
 
     if clean_serial_before_run:
         if reuse_keys_only:
@@ -450,7 +480,17 @@ def run_benchmark(approach, expected_indices, mult_depth=None, scale_factor=None
         else:
             clean_serial_dir()
     else:
-        print("    Reusing serialized data from previous trial")
+        previous_signature = read_serial_signature()
+        serial_dir = BUILD_DIR / "serial"
+        if serial_dir.exists() and previous_signature != serial_signature:
+            previous_label = previous_signature or "unmarked-serial"
+            print(
+                "    Incompatible serialized data detected "
+                f"({previous_label} -> {serial_signature}); cleaning serial/"
+            )
+            clean_serial_dir()
+        else:
+            print("    Reusing serialized data from previous trial")
 
     set_serial_keep_marker(keep_serial_after_run)
     if keep_serial_after_run:
@@ -544,6 +584,8 @@ def run_benchmark(approach, expected_indices, mult_depth=None, scale_factor=None
         }
 
     parsed = parse_output(stdout)
+
+    write_serial_signature(serial_signature)
 
     # Remove the marker after a non-reuse run so later unrelated invocations
     # start from a clean default state.

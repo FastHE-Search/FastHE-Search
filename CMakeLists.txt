@@ -11,7 +11,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-cmake_minimum_required(VERSION 3.5.1)
+cmake_minimum_required(VERSION 3.25.2)
 
 # To use gcc/g++ on a Macintosh, you must set the Compilers here, not inside the
 # project if(APPLE) set(CMAKE_C_COMPILER "/usr/local/bin/gcc-7")
