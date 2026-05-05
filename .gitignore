@@ -60,4 +60,3 @@ overleaf-project/
 
 # Docker H200 (local-only)
 Dockerfile.h200
-.dockerignore

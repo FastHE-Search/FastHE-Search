@@ -1,0 +1,38 @@
+#  Copyright (c) 2026 LG Electronics, Inc.
+#
+#  Licensed under the MIT License (the "License"); you may not use this file
+#  except in compliance with the License.
+#
+#  You may obtain a copy of the License in the LICENSE file at the project
+#  root or at
+#
+#  https://mit-license.org/
+#
+#  SPDX-License-Identifier: MIT
+
+# Ignore common Python virtual environments
+**/venv
+**/env
+**/virtualenv
+
+# Ignore build artifacts (case-sensitive)
+**/build
+**/BUILD
+**/dist
+**/out
+**/target
+
+# Ignore compiled Python files
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+# Ignore the benchmark_results directory and all its contents except the benchmark script
+benchmark_results/
+!benchmark_results/aggregate_benchmarks.py
+
+# Generally ignore log and csv files
+**/*.log
+**/*.csv
+
