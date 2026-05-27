@@ -26,11 +26,45 @@ cmake_minimum_required(VERSION 3.25.2)
 # custom application. If you need your application to be linked statically, then
 # run "cmake .. -DBUILD_STATIC=ON"
 
-project(demo CXX)
-set(CMAKE_CXX_STANDARD 17)
+if(NOT USE_GPU)
+  project(FastHE-Search CXX)
+else()
+  project(FastHE-Search CXX CUDA)
+endif()
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS ON)
+set(CMAKE_C_COMPILER "gcc")
+set(CMAKE_CXX_COMPILER "g++")
+
 option(BUILD_STATIC "Set to ON to include static versions of the library" OFF)
 option(USE_GPU "Set to ON to enable GPU acceleration with FIDESlib" OFF)
-set(FIDESLIB_ROOT "${CMAKE_SOURCE_DIR}/FIDESlib" CACHE PATH "Path to the FIDESlib source tree")
+
+# ############# CUDA Configuration ###################
+if(USE_GPU)
+  # Set CUDA_PATH if not defined previously.
+  if(NOT DEFINED CUDA_PATH)
+    set(CUDA_PATH "/usr/local/cuda")
+  endif()
+
+  set(CMAKE_CUDA_COMPILER "${CUDA_PATH}/bin/nvcc")
+
+  # Check if CUDA is installed.
+  if(NOT EXISTS "${CUDA_PATH}")
+    message(FATAL_ERROR "CUDA not found at ${CUDA_PATH}. Please install CUDA.")
+  endif()
+
+  # Global language config. set(CMAKE_CUDA_ARCHITECTURES "${FIDESLIB_ARCH}")
+  set(CMAKE_CUDA_STANDARD 20)
+  set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+  set(CMAKE_CUDA_EXTENSIONS ON)
+  set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}")
+endif()
+
+set(FIDESLIB_ROOT
+    "${CMAKE_SOURCE_DIR}/FIDESlib"
+    CACHE PATH "Path to the FIDESlib source tree")
 
 if(USE_GPU)
   # GPU enabled: Use FIDESlib's patched OpenFHE 1.2.3 with -O3 -march=native
@@ -40,18 +74,18 @@ if(USE_GPU)
   )
 
   # FIDESlib's internal OpenFHE installation
-  set(FIDESLIB_OPENFHE_INSTALL "${FIDESLIB_ROOT}/openfhe-install")
+  set(OPENFHE_INSTALL_PREFIX "${FIDESLIB_ROOT}/openfhe-install")
 
-  if(EXISTS "${FIDESLIB_OPENFHE_INSTALL}/lib/OpenFHE")
+  if(EXISTS "${OPENFHE_INSTALL_PREFIX}/lib/OpenFHE")
     # Use FIDESlib's internal OpenFHE (preferred for new builds)
-    set(OpenFHE_DIR "${FIDESLIB_OPENFHE_INSTALL}/lib/OpenFHE")
-    set(LOCAL_OPENFHE_DIR "${FIDESLIB_OPENFHE_INSTALL}/lib")
+    set(OpenFHE_DIR "${OPENFHE_INSTALL_PREFIX}/lib/OpenFHE")
+    set(LOCAL_OPENFHE_DIR "${OPENFHE_INSTALL_PREFIX}/lib")
     set(USE_LOCAL_OPENFHE TRUE)
     message(STATUS "Using FIDESlib's internal OpenFHE at: ${OpenFHE_DIR}")
   else()
     message(
       FATAL_ERROR
-        "FIDESlib's OpenFHE installation not found at: ${FIDESLIB_OPENFHE_INSTALL}\n"
+        "FIDESlib's OpenFHE installation not found at: ${OPENFHE_INSTALL_PREFIX}\n"
         "Please build FIDESlib with: cd FIDESlib && mkdir build && cd build && cmake -DFIDESLIB_INSTALL_OPENFHE=ON .. && make"
     )
   endif()
@@ -117,9 +151,7 @@ if(USE_GPU)
     # Use CMake option (already set)
   elseif(DEFINED ENV{FIDESLIB_OPENFHE_DIR})
     set(FIDESLIB_OPENFHE_DIR "$ENV{FIDESLIB_OPENFHE_DIR}")
-  elseif(
-    EXISTS
-    "${FIDESLIB_ROOT}/openfhe-install/lib/libOPENFHEcore_static.a")
+  elseif(EXISTS "${FIDESLIB_ROOT}/openfhe-install/lib/libOPENFHEcore_static.a")
     set(FIDESLIB_OPENFHE_DIR "${FIDESLIB_ROOT}/openfhe-install/lib")
   else()
     set(FIDESLIB_OPENFHE_DIR "/usr/local/fideslib-openfhe")
@@ -147,10 +179,10 @@ if(USE_GPU)
   endif()
 
   # Include FIDESlib headers
-  include_directories(${FIDESLIB_ROOT}/include)
-  # OpenFHE parent include (needed for #include "openfhe/pke/openfhe.h" in .cuh
-  # files)
-  include_directories(${FIDESLIB_OPENFHE_INSTALL}/include)
+  include_directories(${FIDESLIB_ROOT}/api)
+  include_directories(${FIDESLIB_ROOT}/src)
+  # #include "openfhe/pke/openfhe.h" in .cuh files)
+  include_directories(${OPENFHE_INSTALL_PREFIX}/include)
   include_directories(${CMAKE_SOURCE_DIR}/include)
 
   # Link directories
@@ -226,15 +258,17 @@ endif()
 if(USE_GPU)
   # Pass OpenMP flag to host compiler for CUDA files
   target_compile_options(
-    ImageMatching PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
+    ImageMatching PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>
+                          $<$<COMPILE_LANGUAGE:CUDA>:-diag-suppress=611>)
   target_link_libraries(
     ImageMatching
     PRIVATE ${FIDESLIB_DIR}/fideslib.a
             CUDA::cudart
-            ${FIDESLIB_OPENFHE_DIR}/libOPENFHEhook_static.a
+            cuda
             ${FIDESLIB_OPENFHE_DIR}/libOPENFHEpke_static.a
             ${FIDESLIB_OPENFHE_DIR}/libOPENFHEbinfhe_static.a
             ${FIDESLIB_OPENFHE_DIR}/libOPENFHEcore_static.a
+            nccl
             tbb
             pthread
             dl)
@@ -291,15 +325,17 @@ endif()
 if(USE_GPU)
   target_compile_options(
     ImageMatchingAccuracy
-    PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
+    PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>
+            $<$<COMPILE_LANGUAGE:CUDA>:-diag-suppress=611>)
   target_link_libraries(
     ImageMatchingAccuracy
     PRIVATE ${FIDESLIB_DIR}/fideslib.a
             CUDA::cudart
-            ${FIDESLIB_OPENFHE_DIR}/libOPENFHEhook_static.a
+            cuda
             ${FIDESLIB_OPENFHE_DIR}/libOPENFHEpke_static.a
             ${FIDESLIB_OPENFHE_DIR}/libOPENFHEbinfhe_static.a
             ${FIDESLIB_OPENFHE_DIR}/libOPENFHEcore_static.a
+            nccl
             tbb
             pthread
             dl)

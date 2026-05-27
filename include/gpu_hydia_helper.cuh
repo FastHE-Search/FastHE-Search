@@ -20,6 +20,7 @@
 #include <string>
 #ifdef USE_GPU_ACCELERATION
 #include <cuda_runtime.h> // cudaStream_t for multi-stream parallelism
+#include <CKKS/forwardDefs.cuh>
 #else
 typedef void *cudaStream_t; // Stub for non-GPU builds
 #endif
@@ -28,19 +29,6 @@ using namespace lbcrypto;
 
 // Unified GPU memory safety fraction (single place to change)
 constexpr double GPU_MEMORY_SAFE_FRACTION = 0.95;
-
-// Forward declarations to avoid including CUDA headers in regular C++ compilation
-namespace FIDESlib
-{
-    namespace CKKS
-    {
-        class Context;
-        class KeySwitchingKey;
-        struct RawParams;
-        struct RawCipherText;
-        struct RawKeySwitchKey;
-    }
-}
 
 /**
  * GPU Hydia Helper — Approaches 51 (Pure Diagonal) and 81 (BSGS)
@@ -234,8 +222,8 @@ public:
         size_t signDepth);
 
 private:
-    CryptoContext<DCRTPoly> cc_;
-    KeyPair<DCRTPoly> keys_;
+    lbcrypto::CryptoContext<lbcrypto::DCRTPoly> cc_;
+    lbcrypto::KeyPair<lbcrypto::DCRTPoly> keys_;
     bool gpuContextReady_;
     int batchSize_;
     bool gpuMemoryInsufficient_ = false;
@@ -245,9 +233,13 @@ private:
 
 #ifdef USE_GPU_ACCELERATION
     // GPU-specific members
-    std::unique_ptr<FIDESlib::CKKS::Context> gpuContext_;
-    std::unique_ptr<FIDESlib::CKKS::KeySwitchingKey> kskEval_;
-    std::map<int, std::unique_ptr<FIDESlib::CKKS::KeySwitchingKey>> kskRotations_;
+    // Updated V2 FIDESlib class fields
+    // std::shared_ptr<::fideslib::ckks::CryptoContext> gpuContext_;
+    // std::shared_ptr<::fideslib::ckks::PublicKey> kskEval_;
+    // std::map<int, std::shared_ptr<::fideslib::ckks::PublicKey>> kskRotations_;
+    ::FIDESlib::CKKS::Context gpuContext_;
+    std::shared_ptr<::FIDESlib::CKKS::KeySwitchingKey> kskEval_;
+    std::map<int, std::shared_ptr<::FIDESlib::CKKS::KeySwitchingKey>> kskRotations_;
 
     // Cached diagonals on GPU (void* = FIDESlib::CKKS::Ciphertext*)
     std::vector<void *> cachedGPUDiagonals_;

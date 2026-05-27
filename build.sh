@@ -233,7 +233,7 @@ build_fideslib() {
     echo -e "${BLUE}========================================${NC}"
     echo -e "${BLUE}Building FIDESlib with optimized OpenFHE${NC}"
     echo -e "${BLUE}========================================${NC}"
-    
+
     resolve_fideslib_dir
 
     local cuda_arches
@@ -244,11 +244,12 @@ build_fideslib() {
     cmake -S "$FIDESLIB_DIR" -B "$FIDESLIB_DIR/build" \
           -DFIDESLIB_INSTALL_OPENFHE=ON \
           -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_CUDA_ARCHITECTURES="$cuda_arches"
-    
+          -DFIDESLIB_ARCH="$cuda_arches" \
+          -DOPENFHE_INSTALL_PREFIX="${FIDESLIB_DIR}/openfhe-install"
+
     echo -e "${YELLOW}Building FIDESlib...${NC}"
     cmake --build "$FIDESLIB_DIR/build" -j"$JOBS"
-    
+
     echo -e "${GREEN}✓ FIDESlib build complete!${NC}"
 }
 
@@ -256,12 +257,12 @@ build_cpu() {
     echo -e "${BLUE}========================================${NC}"
     echo -e "${BLUE}Building HyDia for CPU (OpenFHE 1.3.0)${NC}"
     echo -e "${BLUE}========================================${NC}"
-    
+
     require_command cmake
 
     mkdir -p "$BUILD_DIR"
     cd "$BUILD_DIR"
-    
+
     # Clean CMake cache to ensure fresh configuration
     # This prevents GPU settings from affecting CPU build
     if [ -f "CMakeCache.txt" ]; then
@@ -269,15 +270,15 @@ build_cpu() {
         rm -f CMakeCache.txt
         rm -rf CMakeFiles/
     fi
-    
+
     echo -e "${YELLOW}Running CMake...${NC}"
     cmake -DUSE_GPU=OFF \
           -DCOMP_DEPTH_VAL="${COMP_DEPTH_VAL:-8}" \
           "$SCRIPT_DIR" || exit 1
-    
+
     echo -e "${YELLOW}Building...${NC}"
         cmake --build "$BUILD_DIR" -j"$JOBS" || exit 1
-    
+
     echo -e "${GREEN}✓ CPU build complete!${NC}"
     echo -e "${GREEN}OpenFHE Version: 1.3.0 (system)${NC}"
     echo -e "${GREEN}Supported approaches: 1-8, 11${NC}"
@@ -294,7 +295,7 @@ build_gpu() {
     resolve_fideslib_dir
     local cuda_arches
     cuda_arches="$(detect_cuda_architectures)"
-    
+
     # Check if FIDESlib needs to be built
     if [ ! -f "$FIDESLIB_DIR/build/fideslib.a" ]; then
         echo -e "${YELLOW}FIDESlib not found. Building automatically...${NC}"
@@ -302,19 +303,19 @@ build_gpu() {
     else
         echo -e "${GREEN}✓ FIDESlib found at $FIDESLIB_DIR/build/${NC}"
     fi
-    
+
     # Verify FIDESlib's OpenFHE installation
     FIDESLIB_OPENFHE="$FIDESLIB_DIR/openfhe-install"
     if [ ! -d "$FIDESLIB_OPENFHE/lib/OpenFHE" ]; then
         echo -e "${YELLOW}FIDESlib's OpenFHE not found. Rebuilding FIDESlib...${NC}"
         build_fideslib
     fi
-    
+
     echo -e "${GREEN}Using FIDESlib's patched OpenFHE: $FIDESLIB_OPENFHE${NC}"
-    
+
     mkdir -p "$BUILD_DIR"
     cd "$BUILD_DIR"
-    
+
     # Clean CMake cache to ensure fresh configuration
     # This prevents CPU settings from affecting GPU build
     if [ -f "CMakeCache.txt" ]; then
@@ -322,7 +323,7 @@ build_gpu() {
         rm -f CMakeCache.txt
         rm -rf CMakeFiles/
     fi
-    
+
     echo -e "${YELLOW}Using CUDA architectures: $cuda_arches${NC}"
     echo -e "${YELLOW}Running CMake with GPU support (Release mode with -O3)...${NC}"
     cmake -DUSE_GPU=ON \
@@ -333,10 +334,10 @@ build_gpu() {
           -DCMAKE_CUDA_ARCHITECTURES="$cuda_arches" \
           -DCOMP_DEPTH_VAL="${COMP_DEPTH_VAL:-8}" \
           "$SCRIPT_DIR" || exit 1
-    
+
     echo -e "${YELLOW}Building with CUDA...${NC}"
     cmake --build "$BUILD_DIR" -j"$JOBS" || exit 1
-    
+
     echo -e "${GREEN}✓ GPU build complete!${NC}"
     echo -e "${GREEN}OpenFHE Version: 1.2.3 (FIDESlib-patched, -O3 -march=native)${NC}"
     echo -e "${GREEN}Supported approaches: 1-11, 51, 81 (51 HyDia-GPU, 81 BSGS-GPU)${NC}"

@@ -24,7 +24,7 @@ FROM ubuntu:24.04
 ARG LD_LIBRARY_PATH
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    OFHE_VERSION=v1.2.3 \
+    OFHE_VERSION=v1.4.2 \
     OFHE_DIR=/opt/openfhe \
     IMATCH_DIR=/opt/image_matching
 
