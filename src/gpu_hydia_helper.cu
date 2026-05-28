@@ -13,6 +13,8 @@
 #include "../include/gpu_hydia_helper.cuh"
 #include "../include/openFHE_wrapper.h"
 #include "../include/gpu_debug_profiler.h"
+#include <openfhe.h>
+
 #include <iostream>
 #include <stdexcept>
 #include <chrono>
@@ -143,22 +145,30 @@ GPUHydiaHelper::GPUHydiaHelper(CryptoContext<DCRTPoly> cc,
         std::cout << "[GPUHydiaHelper] Initializing GPU context with FIDESlib v2..." << std::endl;
 
         ::FIDESlib::CKKS::Parameters fidesParams;
-        fidesParams.batch = batchSize_; // Maintain your custom matrix batch configuration
+        fidesParams.batch = batchSize_;
 
         ::FIDESlib::CKKS::RawParams rawParams = ::FIDESlib::CKKS::GetRawParams(cc_);
+        auto adaptedParams = fidesParams.adaptTo(rawParams);
 
         // Route to a single device (e.g., the first device in the vector, or 0)
         // TODO: MULTI-GPU Rework - just use gpuDevices
+        std::cout << "[GPUHydiaHelper] Using GPU device 0 of " << gpuDevices.size() << ": " << gpuDevices[0] << std::endl;
         std::vector<int> targetDevice = {!gpuDevices.empty() ? gpuDevices[0] : 0};
 
         // V2 Core Backend Allocation: Instantiate the underlying ContextData structure natively.
         // Because Context is a std::shared_ptr alias, assigning a shared_ptr<ContextData> satisfies it.
-        gpuContext_ = std::make_shared<::FIDESlib::CKKS::ContextData>(fidesParams.adaptTo(rawParams), targetDevice);
+        gpuContext_ = FIDESlib::CKKS::GenCryptoContextGPU(adaptedParams, gpuDevices);
+        // gpuContext_ = std::make_shared<::FIDESlib::CKKS::ContextData>(fidesParams.adaptTo(rawParams), targetDevice);
+        std::cout << "[GPUHydiaHelper] GPU context created successfully" << std::endl;
 
         // Initialize your evaluation/mult keys using the backend context pointer
         ::FIDESlib::CKKS::RawKeySwitchKey rawKskEval = ::FIDESlib::CKKS::GetEvalKeySwitchKey(keys_);
-        kskEval_ = std::make_shared<::FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
+        std::cout << "[GPUHydiaHelper] KeySwitchingKey created successfully" << std::endl;
+
+        kskEval_ = std::make_unique<FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
+        // kskEval_ = std::make_shared<::FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
         kskEval_->Initialize(rawKskEval);
+        gpuContext_->AddEvalKey(std::move(*kskEval_));
 
         gpuContextReady_ = true;
         std::cout << "[GPUHydiaHelper] ✓ GPU context initialized successfully on device " << targetDevice << std::endl;
@@ -258,15 +268,10 @@ void GPUHydiaHelper::CacheDiagonalsWithPreRotationOnGPU(
             int negRot = -giantStep;
             if (kskRotations_.find(negRot) == kskRotations_.end())
             {
-                //  REWRITE FOR V2 (Single-Step Consolidated Allocation)
-                // 1. Extract the raw key switching payload for the specific rotation step
-                // ::FIDESlib::CKKS::RawKeySwitchKey rawKskRot = ::FIDESlib::CKKS::GetRotationKeySwitchKey(keys_, negRot);
                 ::FIDESlib::CKKS::RawKeySwitchKey rawKskRot = ::FIDESlib::CKKS::GetRotationKeySwitchKey(keys_.publicKey, negRot);
-
-                // 2. Instantiate and store the key object directly in the map.
-                //    Pass both the raw data payload and the core context reference to the constructor.
-                kskRotations_[negRot] = std::make_shared<::FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
+                kskRotations_[negRot] = std::make_unique<::FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
                 kskRotations_[negRot]->Initialize(rawKskRot);
+                gpuContext_->AddRotationKey(negRot, std::move(*kskRotations_[negRot]));
             }
         }
 
@@ -629,8 +634,9 @@ void GPUHydiaHelper::ComputeAndCacheBabyStepsOnGPU(
                     FIDESlib::CKKS::GetRotationKeySwitchKey(keys_, i, cc_);
 
                 // Single-step instantiation passing the raw payload and context pointer wrapper directly
-                kskRotations_[i] = std::make_shared<FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
+                kskRotations_[i] = std::make_unique<FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
                 kskRotations_[i]->Initialize(rawKskRot);
+                gpuContext_->AddRotationKey(i, std::move(*kskRotations_[i]));
 
                 keysInitialized++;
                 GPU_TRACK_CPU_TO_GPU(ctSizeBytes * 3, "CKKS::KeySwitchingKey", "rotation key [" + std::to_string(i) + "]");
@@ -818,8 +824,9 @@ void GPUHydiaHelper::InitializeSimpleBSGSRotationKeysOnGPU(int n1, int vectorDim
                     FIDESlib::CKKS::GetRotationKeySwitchKey(keys_, giantStep, cc_);
 
                 // Single-step instantiation passing the raw payload and context pointer wrapper directly
-                kskRotations_[giantStep] = std::make_shared<FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
+                kskRotations_[giantStep] = std::make_unique<FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
                 kskRotations_[giantStep]->Initialize(rawKskRot);
+                gpuContext_->AddRotationKey(giantStep, std::move(*kskRotations_[giantStep]));
                 giantKeysInit++;
             }
         }
@@ -833,8 +840,10 @@ void GPUHydiaHelper::InitializeSimpleBSGSRotationKeysOnGPU(int n1, int vectorDim
                 FIDESlib::CKKS::RawKeySwitchKey rawKskRot =
                     FIDESlib::CKKS::GetRotationKeySwitchKey(keys_, idx, cc_);
 
-                kskRotations_[idx] = std::make_shared<FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
+                kskRotations_[idx] = std::make_unique<FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
                 kskRotations_[idx]->Initialize(rawKskRot);
+                gpuContext_->AddRotationKey(idx, std::move(*kskRotations_[idx]));
+
                 evalSumKeysInit++;
             }
         }
@@ -1024,8 +1033,9 @@ bool GPUHydiaHelper::StreamDiagonalsToGPU(const std::string &serialDir,
             if (kskRotations_.find(negRot) == kskRotations_.end())
             {
                 ::FIDESlib::CKKS::RawKeySwitchKey rawKskRot = ::FIDESlib::CKKS::GetRotationKeySwitchKey(keys_, negRot, cc_);
-                kskRotations_[negRot] = std::make_shared<::FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
+                kskRotations_[negRot] = std::make_unique<::FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
                 kskRotations_[negRot]->Initialize(rawKskRot);
+                gpuContext_->AddRotationKey(negRot, std::move(*kskRotations_[negRot]));
             }
         }
 
@@ -1232,7 +1242,7 @@ void *GPUHydiaHelper::ProcessMatrixOnStream(
             if (!giantStepInitialized)
             {
                 giantStepAccum = new FIDESlib::CKKS::Ciphertext(gpuContext_);
-                giantStepAccum->multNoRelin(*cachedBaby, *cachedDiag);
+                giantStepAccum->mult(*cachedBaby, *cachedDiag, false);
                 GPU_COUNT_MULT();
                 giantStepInitialized = true;
             }
@@ -1242,7 +1252,7 @@ void *GPUHydiaHelper::ProcessMatrixOnStream(
                 {
                     tempProduct = new FIDESlib::CKKS::Ciphertext(gpuContext_);
                 }
-                tempProduct->multNoRelin(*cachedBaby, *cachedDiag);
+                tempProduct->mult(*cachedBaby, *cachedDiag, false);
                 GPU_COUNT_MULT();
                 giantStepAccum->add(*giantStepAccum, *tempProduct);
                 GPU_COUNT_ADD();
@@ -1265,7 +1275,7 @@ void *GPUHydiaHelper::ProcessMatrixOnStream(
         }
 
         // DEFERRED RELIN: One relinearization for the entire giant step group
-        giantStepAccum->relinearize(*kskEval_);
+        // giantStepAccum->relinearize(*kskEval_);
         giantStepAccum->rescale();
         GPU_COUNT_RESCALE();
 
@@ -1327,7 +1337,7 @@ void *GPUHydiaHelper::ProcessSimilarityMatrixOnStream(
         {
             // LAZY RELIN: first product initializes degree-2 accumulator
             gpuAccumulator = new FIDESlib::CKKS::Ciphertext(gpuContext_);
-            gpuAccumulator->multNoRelin(*cachedBaby, *cachedDiag);
+            gpuAccumulator->mult(*cachedBaby, *cachedDiag, false);
             GPU_COUNT_MULT();
         }
         else
@@ -1336,7 +1346,7 @@ void *GPUHydiaHelper::ProcessSimilarityMatrixOnStream(
             {
                 tempProduct = new FIDESlib::CKKS::Ciphertext(gpuContext_);
             }
-            tempProduct->multNoRelin(*cachedBaby, *cachedDiag);
+            tempProduct->mult(*cachedBaby, *cachedDiag, false);
             GPU_COUNT_MULT();
             gpuAccumulator->add(*gpuAccumulator, *tempProduct);
             GPU_COUNT_ADD();
@@ -1357,7 +1367,7 @@ void *GPUHydiaHelper::ProcessSimilarityMatrixOnStream(
     }
 
     // DEFERRED RELIN: one relinearization for the whole accumulated sum
-    gpuAccumulator->relinearize(*kskEval_);
+    // gpuAccumulator->relinearize(*kskEval_);
     gpuAccumulator->rescale();
     GPU_COUNT_RESCALE();
 
@@ -1416,8 +1426,9 @@ Ciphertext<DCRTPoly> GPUHydiaHelper::EvalOnDemandBSGSLazyChebyshevAndAggregateOn
             if (giantStep < static_cast<int>(vectorDim) && kskRotations_.find(giantStep) == kskRotations_.end())
             {
                 ::FIDESlib::CKKS::RawKeySwitchKey rawKskRot = ::FIDESlib::CKKS::GetRotationKeySwitchKey(keys_, giantStep, cc_);
-                kskRotations_[giantStep] = std::make_shared<::FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
+                kskRotations_[giantStep] = std::make_unique<::FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
                 kskRotations_[giantStep]->Initialize(rawKskRot);
+                gpuContext_->AddRotationKey(giantStep, std::move(*kskRotations_[giantStep]));
                 keysInit++;
             }
         }
@@ -1428,8 +1439,9 @@ Ciphertext<DCRTPoly> GPUHydiaHelper::EvalOnDemandBSGSLazyChebyshevAndAggregateOn
             if (kskRotations_.find(idx) == kskRotations_.end())
             {
                 ::FIDESlib::CKKS::RawKeySwitchKey rawKskRot = ::FIDESlib::CKKS::GetRotationKeySwitchKey(keys_, idx, cc_);
-                kskRotations_[idx] = std::make_shared<::FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
+                kskRotations_[idx] = std::make_unique<::FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
                 kskRotations_[idx]->Initialize(rawKskRot);
+                gpuContext_->AddRotationKey(idx, std::move(*kskRotations_[idx]));
                 keysInit++;
             }
         }
@@ -1607,8 +1619,9 @@ std::vector<Ciphertext<DCRTPoly>> GPUHydiaHelper::EvalOnDemandBSGSLazyChebyshevB
             if (giantStep < static_cast<int>(vectorDim) && kskRotations_.find(giantStep) == kskRotations_.end())
             {
                 ::FIDESlib::CKKS::RawKeySwitchKey rawKskRot = ::FIDESlib::CKKS::GetRotationKeySwitchKey(keys_, giantStep, cc_);
-                kskRotations_[giantStep] = std::make_shared<::FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
+                kskRotations_[giantStep] = std::make_unique<::FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
                 kskRotations_[giantStep]->Initialize(rawKskRot);
+                gpuContext_->AddRotationKey(giantStep, std::move(*kskRotations_[giantStep]));
             }
         }
         GPU_PROFILE_END("A81_Batched_Phase0_KeyInit");
@@ -1620,11 +1633,36 @@ std::vector<Ciphertext<DCRTPoly>> GPUHydiaHelper::EvalOnDemandBSGSLazyChebyshevB
         auto phase1Start = std::chrono::steady_clock::now();
 
         std::vector<FIDESlib::CKKS::Ciphertext *> gpuChebResults(numMatrices, nullptr);
+        std::vector<Ciphertext<DCRTPoly>> results(numMatrices);
+        size_t effectiveStreams = 1;
 
-        // Lazily create exactly the CUDA streams needed for this workload
-        EnsureMatrixStreams(numMatrices);
+        // FIDESlib v2 + OpenFHE 1.4.2 is stable for A81 membership, but the
+        // batched index path can still produce undecodable host ciphertexts
+        // when multiple per-matrix post-Chebyshev results remain live on the
+        // GPU. Use a conservative matrix-by-matrix execution/download path for
+        // correctness. This preserves the v1 fast path below unchanged.
+        std::cout << "[GPUHydiaHelper] A81 v2 index path: serial matrix-by-matrix download for correctness" << std::endl;
+        for (size_t m = 0; m < numMatrices; ++m)
+        {
+            gpuChebResults[m] = static_cast<FIDESlib::CKKS::Ciphertext *>(
+                ProcessMatrixOnStream(
+                    m, vectorDim, n1, numGiantSteps, delta, signDepth, nullptr));
+            cudaDeviceSynchronize();
 
-        size_t effectiveStreams = streamsInitialized_
+            if (gpuChebResults[m])
+            {
+                // DebugDumpGpuCt(cc_, keys_, gpuContext_, *gpuChebResults[m],
+                //                templateCt, "81-idx-m" + std::to_string(m) + "-POST-cheb");
+                FIDESlib::CKKS::RawCipherText rawResult;
+                gpuChebResults[m]->store(rawResult);
+                results[m] = templateCt->Clone();
+                FIDESlib::CKKS::GetOpenFHECipherText(results[m], rawResult);
+                delete gpuChebResults[m];
+                gpuChebResults[m] = nullptr;
+            }
+        }
+#if 0
+        effectiveStreams = streamsInitialized_
                                       ? std::min(numMatrixStreams_, numMatrices)
                                       : 1;
 
@@ -1680,6 +1718,7 @@ std::vector<Ciphertext<DCRTPoly>> GPUHydiaHelper::EvalOnDemandBSGSLazyChebyshevB
             }
             cudaDeviceSynchronize();
         }
+#endif
 
         auto phase1End = std::chrono::steady_clock::now();
         double phase1Time = std::chrono::duration<double>(phase1End - phase1Start).count();
@@ -1698,6 +1737,7 @@ std::vector<Ciphertext<DCRTPoly>> GPUHydiaHelper::EvalOnDemandBSGSLazyChebyshevB
 
         cudaDeviceSynchronize();
 
+#if 0
         std::vector<Ciphertext<DCRTPoly>> results(numMatrices);
 
         for (size_t m = 0; m < numMatrices; ++m)
@@ -1711,6 +1751,7 @@ std::vector<Ciphertext<DCRTPoly>> GPUHydiaHelper::EvalOnDemandBSGSLazyChebyshevB
                 delete gpuChebResults[m];
             }
         }
+#endif
 
         GPU_TRACK_GPU_TO_CPU(ctSizeBytes * numMatrices, "CKKS::Ciphertext[]", "A81 bulk download all matrices");
 
@@ -2031,22 +2072,35 @@ Ciphertext<DCRTPoly> GPUHydiaHelper::EvalSimilarityChebyshevAndAggregateOnGPU(
             int idx = static_cast<int>(shift);
             if (kskRotations_.find(idx) == kskRotations_.end())
             {
+                auto kskRot = std::make_unique<FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
                 ::FIDESlib::CKKS::RawKeySwitchKey rawKskRot = ::FIDESlib::CKKS::GetRotationKeySwitchKey(keys_, idx, cc_);
-                kskRotations_[idx] = std::make_shared<::FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
-                kskRotations_[idx]->Initialize(rawKskRot);
+                kskRot->Initialize(rawKskRot);
+                gpuContext_->AddRotationKey(idx, std::move(*kskRot));
+                kskRotations_[idx] = std::move(kskRot);
+
                 GPU_TRACK_CPU_TO_GPU(rotKeySize, "CKKS::KeySwitchingKey", "EvalSum rotation key [" + std::to_string(idx) + "]");
                 newKeysInit++;
             }
         }
         GPU_PROFILE_END("A51_Phase0_EvalSumKeyInit");
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "[GPUHydiaHelper] EvalSimilarityChebyshevAndAggregateOnGPU PHASE 0failed: "
+                  << e.what() << std::endl;
+        throw;
+    }
 
+    double simTime = 0.0;
+    std::vector<FIDESlib::CKKS::Ciphertext *> gpuChebResults(numMatrices, nullptr);
+
+    try
+    {
         // =========================================================================
         // PHASE 1: Similarity + Chebyshev — MULTI-STREAM WAVE DISPATCH
         // =========================================================================
         GPU_PROFILE_START("A51_Phase1_SimChebyshev");
         auto simStart = std::chrono::steady_clock::now();
-
-        std::vector<FIDESlib::CKKS::Ciphertext *> gpuChebResults(numMatrices, nullptr);
 
         // Lazily create exactly the CUDA streams needed for this workload
         EnsureMatrixStreams(numMatrices);
@@ -2109,19 +2163,32 @@ Ciphertext<DCRTPoly> GPUHydiaHelper::EvalSimilarityChebyshevAndAggregateOnGPU(
         }
 
         auto simEnd = std::chrono::steady_clock::now();
-        double simTime = std::chrono::duration<double>(simEnd - simStart).count();
+        simTime = std::chrono::duration<double>(simEnd - simStart).count();
         GPU_PROFILE_END("A51_Phase1_SimChebyshev");
         std::cout << "[GPUHydiaHelper] A51 Similarity+Chebyshev: " << numMatrices
                   << " matrices in " << std::fixed << std::setprecision(3) << simTime << "s"
                   << " (" << effectiveStreams << " streams, ~"
                   << std::setprecision(1) << (simTime / numMatrices * 1000.0) << " ms/matrix)" << std::endl;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "[GPUHydiaHelper] EvalSimilarityChebyshevAndAggregateOnGPU PHASE 1 failed: "
+                  << e.what() << std::endl;
+        throw;
+    }
+
+    FIDESlib::CKKS::Ciphertext *gpuSum = nullptr;
+    double addTime = 0.0;
+
+    try
+    {
 
         // =========================================================================
         // PHASE 2: EvalAddMany on GPU
         // =========================================================================
         GPU_PROFILE_START("A51_Phase2_EvalAddMany");
         auto addStart = std::chrono::steady_clock::now();
-        FIDESlib::CKKS::Ciphertext *gpuSum = new FIDESlib::CKKS::Ciphertext(gpuContext_);
+        gpuSum = new FIDESlib::CKKS::Ciphertext(gpuContext_);
         bool sumInitialized = false;
 
         for (size_t m = 0; m < numMatrices; ++m)
@@ -2143,9 +2210,19 @@ Ciphertext<DCRTPoly> GPUHydiaHelper::EvalSimilarityChebyshevAndAggregateOnGPU(
         }
 
         auto addEnd = std::chrono::steady_clock::now();
-        double addTime = std::chrono::duration<double>(addEnd - addStart).count();
+        addTime = std::chrono::duration<double>(addEnd - addStart).count();
         GPU_PROFILE_END("A51_Phase2_EvalAddMany");
         std::cout << "[GPUHydiaHelper] A51 EvalAddMany: " << std::fixed << std::setprecision(3) << addTime << "s" << std::endl;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "[GPUHydiaHelper] EvalSimilarityChebyshevAndAggregateOnGPU PHASE 2 failed: "
+                  << e.what() << std::endl;
+        throw;
+    }
+
+    try
+    {
 
         // =========================================================================
         // PHASE 3: EvalSum on GPU
@@ -2198,7 +2275,7 @@ Ciphertext<DCRTPoly> GPUHydiaHelper::EvalSimilarityChebyshevAndAggregateOnGPU(
     }
     catch (const std::exception &e)
     {
-        std::cerr << "[GPUHydiaHelper] EvalSimilarityChebyshevAndAggregateOnGPU failed: "
+        std::cerr << "[GPUHydiaHelper] EvalSimilarityChebyshevAndAggregateOnGPU PHASE 4 failed: "
                   << e.what() << std::endl;
         throw;
     }

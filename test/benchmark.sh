@@ -236,12 +236,12 @@ run_benchmark() {
     local clean_serial=${7:-true}
     local keep_serial=${8:-false}
     local reuse_keys_only=${9:-false}
-    
+
     echo ""
     echo -e "${GREEN}--------------------------------------${NC}"
     echo -e "${GREEN}Running benchmark: 2^${logn} vectors, k=${kmatch}, trial ${trial}/${NUM_TRIALS}${NC}"
     echo -e "${GREEN}--------------------------------------${NC}"
-    
+
     # Run benchmark (logn and kmatch are positional args, others are optional)
     # Pass trial number to Python script
     # Export BUILD_DIR and TEST_DATA_DIR for the Python script
@@ -304,19 +304,19 @@ set_trial_serial_policy() {
 # Build function (separate from benchmark)
 build_for_mode() {
     local build_type=$1
-    
+
     echo ""
     echo -e "${YELLOW}======================================${NC}"
     echo -e "${YELLOW}Building for ${build_type}...${NC}"
     echo -e "${YELLOW}Build directory: ${BUILD_DIR}${NC}"
     echo -e "${YELLOW}======================================${NC}"
-    
+
     cd "$PROJECT_ROOT"
     if [ "$build_type" == "cpu" ]; then
         echo "Building with OpenFHE v1.3.0..."
         ./build.sh cpu 2>&1 | tail -20
     else
-        echo "Building with OpenFHE v1.2.3 (optimized)..."
+        echo "Building with OpenFHE v1.4.2 (optimized)..."
         ./build.sh gpu 2>&1 | tail -20
     fi
 }
@@ -329,24 +329,24 @@ case "$BUILD_MODE" in
         if [ -n "$APPROACHES_CPU" ]; then
             BASE_EXTRA_ARGS="--approaches $APPROACHES_CPU"
         fi
-        
+
         # Single output CSV for all runs - include t value in filename
         OUTPUT_CSV="$OUTPUT_DIR/benchmark_cpu_t${NUM_TRIALS}_${TIMESTAMP}.csv"
         mkdir -p "$OUTPUT_DIR"
-        
+
         echo ""
         echo -e "${GREEN}======================================${NC}"
         echo -e "${GREEN}Running CPU benchmarks (${NUM_TRIALS} trial(s) each)...${NC}"
         echo -e "${GREEN}Output: ${OUTPUT_CSV}${NC}"
         echo -e "${GREEN}======================================${NC}"
-        
+
         # Store indices per configuration for reuse across trials (when fresh_dataset=false)
         declare -A CONFIG_INDICES
-        
+
         for i in "${!LOGN_ARRAY[@]}"; do
             LOGN="${LOGN_ARRAY[$i]}"
             KMATCH="${KMATCH_ARRAY[$i]}"
-            
+
             for trial in $(seq 1 $NUM_TRIALS); do
                 set_trial_serial_policy "$trial"
 
@@ -379,24 +379,24 @@ case "$BUILD_MODE" in
         if [ -n "$APPROACHES_GPU" ]; then
             BASE_EXTRA_ARGS="--approaches $APPROACHES_GPU"
         fi
-        
+
         # Single output CSV for all runs - include t value in filename
         OUTPUT_CSV="$OUTPUT_DIR/benchmark_gpu_t${NUM_TRIALS}_${TIMESTAMP}.csv"
         mkdir -p "$OUTPUT_DIR"
-        
+
         echo ""
         echo -e "${GREEN}======================================${NC}"
         echo -e "${GREEN}Running GPU benchmarks (${NUM_TRIALS} trial(s) each)...${NC}"
         echo -e "${GREEN}Output: ${OUTPUT_CSV}${NC}"
         echo -e "${GREEN}======================================${NC}"
-        
+
         # Store indices per configuration for reuse across trials (when fresh_dataset=false)
         declare -A CONFIG_INDICES
-        
+
         for i in "${!LOGN_ARRAY[@]}"; do
             LOGN="${LOGN_ARRAY[$i]}"
             KMATCH="${KMATCH_ARRAY[$i]}"
-            
+
             for trial in $(seq 1 $NUM_TRIALS); do
                 set_trial_serial_policy "$trial"
 
@@ -425,35 +425,35 @@ case "$BUILD_MODE" in
         ;;
     both)
         echo -e "${YELLOW}Running benchmarks for both CPU and GPU builds${NC}"
-        
+
         # Generate a random seed for reproducibility
         SEED=$RANDOM
         echo -e "${BLUE}Using seed: ${SEED} for reproducible dataset generation${NC}"
-        
+
         # Single output CSV for ALL runs (both CPU and GPU) - include t value in filename
         OUTPUT_CSV="$OUTPUT_DIR/benchmark_both_t${NUM_TRIALS}_${TIMESTAMP}.csv"
         mkdir -p "$OUTPUT_DIR"
-        
+
         # Build and run CPU benchmarks
         build_for_mode "cpu"
         BASE_EXTRA_ARGS_CPU="--seed $SEED"
         if [ -n "$APPROACHES_CPU" ]; then
             BASE_EXTRA_ARGS_CPU="$BASE_EXTRA_ARGS_CPU --approaches $APPROACHES_CPU"
         fi
-        
+
         echo ""
         echo -e "${GREEN}======================================${NC}"
         echo -e "${GREEN}Running CPU benchmarks (${NUM_TRIALS} trial(s) each)...${NC}"
         echo -e "${GREEN}Output: ${OUTPUT_CSV}${NC}"
         echo -e "${GREEN}======================================${NC}"
-        
+
         # Store indices per dataset for reuse across trials and GPU runs (when fresh_dataset=false)
         declare -A INDICES_MAP
-        
+
         for i in "${!LOGN_ARRAY[@]}"; do
             LOGN="${LOGN_ARRAY[$i]}"
             KMATCH="${KMATCH_ARRAY[$i]}"
-            
+
             for trial in $(seq 1 $NUM_TRIALS); do
                 set_trial_serial_policy "$trial"
 
@@ -484,25 +484,25 @@ case "$BUILD_MODE" in
                 fi
             done
         done
-        
+
         # Build and run GPU benchmarks
         build_for_mode "gpu"
-        
+
         BASE_EXTRA_ARGS_GPU=""
         if [ -n "$APPROACHES_GPU" ]; then
             BASE_EXTRA_ARGS_GPU="--approaches $APPROACHES_GPU"
         fi
-        
+
         echo ""
         echo -e "${GREEN}======================================${NC}"
         echo -e "${GREEN}Running GPU benchmarks (${NUM_TRIALS} trial(s) each)...${NC}"
         echo -e "${GREEN}Output: ${OUTPUT_CSV}${NC}"
         echo -e "${GREEN}======================================${NC}"
-        
+
         for i in "${!LOGN_ARRAY[@]}"; do
             LOGN="${LOGN_ARRAY[$i]}"
             KMATCH="${KMATCH_ARRAY[$i]}"
-            
+
             for trial in $(seq 1 $NUM_TRIALS); do
                 set_trial_serial_policy "$trial"
 
@@ -513,17 +513,17 @@ case "$BUILD_MODE" in
                     # fresh_dataset=false: Use shared indices from trial 1
                     INDICES="${INDICES_MAP["${LOGN}_${KMATCH}"]}"
                 fi
-                
+
                 if [ -z "$INDICES" ]; then
                     echo -e "${RED}Error: No indices found for dataset logn=$LOGN kmatch=$KMATCH trial=$trial${NC}"
                     continue
                 fi
-                
+
                 EXTRA_ARGS_GPU="$BASE_EXTRA_ARGS_GPU --indices $INDICES"
                 run_benchmark "gpu" "$LOGN" "$KMATCH" "$EXTRA_ARGS_GPU" "$OUTPUT_CSV" "$trial" "$CLEAN_SERIAL" "$KEEP_SERIAL" "$REUSE_KEYS_ONLY"
             done
         done
-        
+
         echo ""
         echo -e "${GREEN}======================================${NC}"
         echo -e "${GREEN}Both benchmarks complete!${NC}"
@@ -547,23 +547,23 @@ case "$BUILD_MODE" in
         else
             BUILD_LABEL="unknown"
         fi
-        
+
         # Single output CSV for all runs - include t value in filename
         OUTPUT_CSV="$OUTPUT_DIR/benchmark_${BUILD_LABEL}_t${NUM_TRIALS}_${TIMESTAMP}.csv"
         mkdir -p "$OUTPUT_DIR"
-        
+
         echo ""
         echo -e "${GREEN}Running benchmarks with current build (${NUM_TRIALS} trial(s) each)...${NC}"
         echo -e "${GREEN}Build directory: ${BUILD_DIR}${NC}"
         echo -e "${GREEN}Output: ${OUTPUT_CSV}${NC}"
-        
+
         # Store indices per dataset for reuse across trials (when fresh_dataset=false)
         declare -A INDICES_MAP
-        
+
         for i in "${!LOGN_ARRAY[@]}"; do
             LOGN="${LOGN_ARRAY[$i]}"
             KMATCH="${KMATCH_ARRAY[$i]}"
-            
+
             for trial in $(seq 1 $NUM_TRIALS); do
                 set_trial_serial_policy "$trial"
 

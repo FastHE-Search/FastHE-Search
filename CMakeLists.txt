@@ -1,5 +1,6 @@
-# Portions copyright (c) 2025 Sam Martin, Nirajan Koirala, Helena Berens, Micah
-# Brody, Taeho Jung Portions copyright (c) 2026 LG Electronics, Inc.
+# cmake-format: off
+# Portions copyright (c) 2025 Sam Martin, Nirajan Koirala, Helena Berens, Micah Brody, Taeho Jung
+# Portions copyright (c) 2026 LG Electronics, Inc.
 #
 # Licensed under the MIT License (the "License"); you may not use this file
 # except in compliance with the License.
@@ -10,6 +11,7 @@
 # https://mit-license.org/
 #
 # SPDX-License-Identifier: MIT
+# cmake-format: on
 
 cmake_minimum_required(VERSION 3.25.2)
 

@@ -42,7 +42,7 @@ show_help() {
     echo ""
     echo "Options:"
     echo "  cpu       Build for CPU only (uses system OpenFHE 1.3.0)"
-    echo "  gpu       Build with GPU support (uses FIDESlib's patched OpenFHE 1.2.3)"
+    echo "  gpu       Build with GPU support (uses FIDESlib's patched OpenFHE 1.4.2)"
     echo "            - Automatically builds FIDESlib with optimized OpenFHE if needed"
     echo "            - OpenFHE built with -O3 -march=native for best performance"
     echo "  clean     Clean improved-hydia build directory only"
@@ -241,9 +241,11 @@ build_fideslib() {
 
     echo -e "${YELLOW}Configuring FIDESlib (this will build OpenFHE 1.2.3 with -O3 -march=native)...${NC}"
     echo -e "${YELLOW}This may take several minutes on first build...${NC}"
+    mkdir -p "$FIDESLIB_DIR/openfhe-install" || true
+
     cmake -S "$FIDESLIB_DIR" -B "$FIDESLIB_DIR/build" \
           -DFIDESLIB_INSTALL_OPENFHE=ON \
-          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_BUILD_TYPE=Debug \
           -DFIDESLIB_ARCH="$cuda_arches" \
           -DOPENFHE_INSTALL_PREFIX="${FIDESLIB_DIR}/openfhe-install"
 
@@ -288,7 +290,7 @@ build_cpu() {
 
 build_gpu() {
     echo -e "${BLUE}========================================${NC}"
-    echo -e "${BLUE}Building HyDia for GPU (OpenFHE 1.2.3)${NC}"
+    echo -e "${BLUE}Building HyDia for GPU (OpenFHE 1.4.2)${NC}"
     echo -e "${BLUE}========================================${NC}"
 
     preflight_gpu_build
@@ -328,7 +330,7 @@ build_gpu() {
     echo -e "${YELLOW}Running CMake with GPU support (Release mode with -O3)...${NC}"
     cmake -DUSE_GPU=ON \
           -DFIDESLIB_ROOT="$FIDESLIB_DIR" \
-          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_BUILD_TYPE=Debug \
           -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG" \
           -DCMAKE_CUDA_FLAGS_RELEASE="-O3" \
           -DCMAKE_CUDA_ARCHITECTURES="$cuda_arches" \

@@ -233,13 +233,9 @@ private:
 
 #ifdef USE_GPU_ACCELERATION
     // GPU-specific members
-    // Updated V2 FIDESlib class fields
-    // std::shared_ptr<::fideslib::ckks::CryptoContext> gpuContext_;
-    // std::shared_ptr<::fideslib::ckks::PublicKey> kskEval_;
-    // std::map<int, std::shared_ptr<::fideslib::ckks::PublicKey>> kskRotations_;
     ::FIDESlib::CKKS::Context gpuContext_;
-    std::shared_ptr<::FIDESlib::CKKS::KeySwitchingKey> kskEval_;
-    std::map<int, std::shared_ptr<::FIDESlib::CKKS::KeySwitchingKey>> kskRotations_;
+    std::unique_ptr<::FIDESlib::CKKS::KeySwitchingKey> kskEval_;
+    std::map<int, std::unique_ptr<::FIDESlib::CKKS::KeySwitchingKey>> kskRotations_;
 
     // Cached diagonals on GPU (void* = FIDESlib::CKKS::Ciphertext*)
     std::vector<void *> cachedGPUDiagonals_;
