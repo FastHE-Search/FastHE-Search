@@ -1223,10 +1223,10 @@ void *GPUHydiaHelper::ProcessMatrixOnStream(
         if (iEnd <= 0)
             continue;
 
-        // LAZY RELIN: Accumulate degree-2 products WITHOUT relinearization
-        FIDESlib::CKKS::Ciphertext *giantStepAccum = nullptr;
-        FIDESlib::CKKS::Ciphertext *tempProduct = nullptr;
-        bool giantStepInitialized = false;
+        std::vector<FIDESlib::CKKS::Ciphertext *> babies;
+        std::vector<FIDESlib::CKKS::Ciphertext *> diagonals;
+        babies.reserve(static_cast<size_t>(iEnd));
+        diagonals.reserve(static_cast<size_t>(iEnd));
 
         for (int i = 0; i < iEnd; ++i)
         {
@@ -1234,48 +1234,19 @@ void *GPUHydiaHelper::ProcessMatrixOnStream(
             if (diagIndex >= static_cast<int>(cachedGPUDiagonals_.size()))
                 continue;
 
-            FIDESlib::CKKS::Ciphertext *cachedBaby =
-                static_cast<FIDESlib::CKKS::Ciphertext *>(cachedGPUBabySteps_[i]);
-            FIDESlib::CKKS::Ciphertext *cachedDiag =
-                static_cast<FIDESlib::CKKS::Ciphertext *>(cachedGPUDiagonals_[diagIndex]);
-
-            if (!giantStepInitialized)
-            {
-                giantStepAccum = new FIDESlib::CKKS::Ciphertext(gpuContext_);
-                giantStepAccum->mult(*cachedBaby, *cachedDiag, false);
-                GPU_COUNT_MULT();
-                giantStepInitialized = true;
-            }
-            else
-            {
-                if (tempProduct == nullptr)
-                {
-                    tempProduct = new FIDESlib::CKKS::Ciphertext(gpuContext_);
-                }
-                tempProduct->mult(*cachedBaby, *cachedDiag, false);
-                GPU_COUNT_MULT();
-                giantStepAccum->add(*giantStepAccum, *tempProduct);
-                GPU_COUNT_ADD();
-            }
+            babies.push_back(static_cast<FIDESlib::CKKS::Ciphertext *>(cachedGPUBabySteps_[i]));
+            diagonals.push_back(static_cast<FIDESlib::CKKS::Ciphertext *>(cachedGPUDiagonals_[diagIndex]));
         }
 
-        if (!giantStepInitialized)
+        if (babies.empty())
         {
-            if (giantStepAccum)
-                delete giantStepAccum;
-            if (tempProduct)
-                delete tempProduct;
             continue;
         }
 
-        if (tempProduct)
-        {
-            delete tempProduct;
-            tempProduct = nullptr;
-        }
+        FIDESlib::CKKS::Ciphertext *giantStepAccum = new FIDESlib::CKKS::Ciphertext(gpuContext_);
+        giantStepAccum->dotProduct(babies, diagonals, false);
+        GPU_COUNT_MULT();
 
-        // DEFERRED RELIN: One relinearization for the entire giant step group
-        // giantStepAccum->relinearize(*kskEval_);
         giantStepAccum->rescale();
         GPU_COUNT_RESCALE();
 
@@ -1318,8 +1289,10 @@ void *GPUHydiaHelper::ProcessSimilarityMatrixOnStream(
     // No giant-step decomposition — all vectorDim baby steps are used directly.
     // This is more efficient than BSGS when n1 = vectorDim (no giant-step rotation overhead).
 
-    FIDESlib::CKKS::Ciphertext *gpuAccumulator = nullptr;
-    FIDESlib::CKKS::Ciphertext *tempProduct = nullptr;
+    std::vector<FIDESlib::CKKS::Ciphertext *> babies;
+    std::vector<FIDESlib::CKKS::Ciphertext *> diagonals;
+    babies.reserve(vectorDim);
+    diagonals.reserve(vectorDim);
 
     for (size_t i = 0; i < vectorDim; ++i)
     {
@@ -1328,46 +1301,19 @@ void *GPUHydiaHelper::ProcessSimilarityMatrixOnStream(
         if (diagIdx >= static_cast<int>(cachedGPUDiagonals_.size()))
             continue;
 
-        FIDESlib::CKKS::Ciphertext *cachedBaby =
-            static_cast<FIDESlib::CKKS::Ciphertext *>(cachedGPUBabySteps_[babyIdx]);
-        FIDESlib::CKKS::Ciphertext *cachedDiag =
-            static_cast<FIDESlib::CKKS::Ciphertext *>(cachedGPUDiagonals_[diagIdx]);
-
-        if (gpuAccumulator == nullptr)
-        {
-            // LAZY RELIN: first product initializes degree-2 accumulator
-            gpuAccumulator = new FIDESlib::CKKS::Ciphertext(gpuContext_);
-            gpuAccumulator->mult(*cachedBaby, *cachedDiag, false);
-            GPU_COUNT_MULT();
-        }
-        else
-        {
-            if (tempProduct == nullptr)
-            {
-                tempProduct = new FIDESlib::CKKS::Ciphertext(gpuContext_);
-            }
-            tempProduct->mult(*cachedBaby, *cachedDiag, false);
-            GPU_COUNT_MULT();
-            gpuAccumulator->add(*gpuAccumulator, *tempProduct);
-            GPU_COUNT_ADD();
-        }
+        babies.push_back(static_cast<FIDESlib::CKKS::Ciphertext *>(cachedGPUBabySteps_[babyIdx]));
+        diagonals.push_back(static_cast<FIDESlib::CKKS::Ciphertext *>(cachedGPUDiagonals_[diagIdx]));
     }
 
-    if (gpuAccumulator == nullptr)
+    if (babies.empty())
     {
-        if (tempProduct)
-            delete tempProduct;
         return static_cast<void *>(new FIDESlib::CKKS::Ciphertext(gpuContext_));
     }
 
-    if (tempProduct)
-    {
-        delete tempProduct;
-        tempProduct = nullptr;
-    }
+    FIDESlib::CKKS::Ciphertext *gpuAccumulator = new FIDESlib::CKKS::Ciphertext(gpuContext_);
+    gpuAccumulator->dotProduct(babies, diagonals, false);
+    GPU_COUNT_MULT();
 
-    // DEFERRED RELIN: one relinearization for the whole accumulated sum
-    // gpuAccumulator->relinearize(*kskEval_);
     gpuAccumulator->rescale();
     GPU_COUNT_RESCALE();
 
@@ -1973,10 +1919,35 @@ void *GPUHydiaHelper::EvalChebyshevSeriesPSOnGPU(void *gpuCtVoid, const std::vec
             result->dropToLevel(tkLevel);
         else if (tkLevel > resLevel)
             T2[0]->dropToLevel(resLevel);
+
+        if (result->NoiseLevel == 2)
+        {
+            result->rescale();
+            GPU_COUNT_RESCALE();
+        }
+        if (T2[0]->NoiseLevel == 2)
+        {
+            T2[0]->rescale();
+            GPU_COUNT_RESCALE();
+        }
+
         result->mult(*T2[0], true);
         GPU_COUNT_MULT();
         combineMults++;
+
+        if (result->NoiseLevel == 2)
+        {
+            result->rescale();
+            GPU_COUNT_RESCALE();
+        }
+
         int newResLevel = result->getLevel(), qjLevel = Q[j]->getLevel();
+        if (Q[j]->NoiseLevel == 2)
+        {
+            Q[j]->rescale();
+            GPU_COUNT_RESCALE();
+            qjLevel = Q[j]->getLevel();
+        }
         if (qjLevel > newResLevel)
             Q[j]->dropToLevel(newResLevel);
         result->add(*Q[j]);
