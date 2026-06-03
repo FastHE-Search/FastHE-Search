@@ -1,3 +1,5 @@
+//  clang-format : off
+//
 //  Copyright (c) 2026 LG Electronics, Inc.
 //
 //  Licensed under the MIT License (the "License"); you may not use this file
@@ -9,6 +11,8 @@
 //  https://mit-license.org/
 //
 //  SPDX-License-Identifier: MIT
+//
+// clang-format : on
 
 #include "../include/gpu_hydia_helper.cuh"
 #include "../include/openFHE_wrapper.h"
@@ -32,19 +36,9 @@
 #define GPU_HYDIA_DEBUG 0
 
 #ifdef USE_GPU_ACCELERATION
-// Full FIDESlib GPU implementation
-// #include "CKKS/Parameters.cuh"
 #include "CKKS/Context.cuh"
 #include "CKKS/Ciphertext.cuh"
-// #include "CKKS/Plaintext.cuh"
 #include "CKKS/KeySwitchingKey.cuh"
-// #include <fideslib.hpp>
-// #include <CryptoContext.hpp>
-// #include <Ciphertext.hpp>
-// #include <Plaintext.hpp>
-// #include <GenCryptoContext.hpp>
-// #include <fideslib.hpp>
-// #include <CCParams.hpp>
 
 // Helper function to estimate GPU memory requirements
 static size_t EstimateCiphertextGPUMemory(size_t N, size_t L)
@@ -150,28 +144,15 @@ GPUHydiaHelper::GPUHydiaHelper(CryptoContext<DCRTPoly> cc,
         ::FIDESlib::CKKS::RawParams rawParams = ::FIDESlib::CKKS::GetRawParams(cc_);
         auto adaptedParams = fidesParams.adaptTo(rawParams);
 
-        // Route to a single device (e.g., the first device in the vector, or 0)
-        // TODO: MULTI-GPU Rework - just use gpuDevices
         std::cout << "[GPUHydiaHelper] Using GPU device 0 of " << gpuDevices.size() << ": " << gpuDevices[0] << std::endl;
-        std::vector<int> targetDevice = {!gpuDevices.empty() ? gpuDevices[0] : 0};
 
-        // V2 Core Backend Allocation: Instantiate the underlying ContextData structure natively.
-        // Because Context is a std::shared_ptr alias, assigning a shared_ptr<ContextData> satisfies it.
         gpuContext_ = FIDESlib::CKKS::GenCryptoContextGPU(adaptedParams, gpuDevices);
-        // gpuContext_ = std::make_shared<::FIDESlib::CKKS::ContextData>(fidesParams.adaptTo(rawParams), targetDevice);
-        std::cout << "[GPUHydiaHelper] GPU context created successfully" << std::endl;
-
-        // Initialize your evaluation/mult keys using the backend context pointer
         ::FIDESlib::CKKS::RawKeySwitchKey rawKskEval = ::FIDESlib::CKKS::GetEvalKeySwitchKey(keys_);
-        std::cout << "[GPUHydiaHelper] KeySwitchingKey created successfully" << std::endl;
-
         kskEval_ = std::make_unique<FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
-        // kskEval_ = std::make_shared<::FIDESlib::CKKS::KeySwitchingKey>(gpuContext_);
         kskEval_->Initialize(rawKskEval);
         gpuContext_->AddEvalKey(std::move(*kskEval_));
 
         gpuContextReady_ = true;
-        std::cout << "[GPUHydiaHelper] ✓ GPU context initialized successfully on device " << targetDevice << std::endl;
     }
     catch (const std::exception &e)
     {
@@ -403,8 +384,6 @@ void GPUHydiaHelper::CachePreRotatedDiagonalsOnGPU(
         {
             FIDESlib::CKKS::RawCipherText raw = FIDESlib::CKKS::GetRawCipherText(cc_, diagonals[i]);
             FIDESlib::CKKS::Ciphertext *gpuDiag = new FIDESlib::CKKS::Ciphertext(gpuContext_, raw);
-
-            // FIDESlib::CKKS::Ciphertext *gpuDiag = new FIDESlib::CKKS::Ciphertext(openfheCt, *gpuContext_);
             GPU_TRACK_CPU_TO_GPU(ctSizeBytes, "CKKS::Ciphertext", "prerot diagonal[" + std::to_string(i) + "]");
             cachedGPUDiagonals_.push_back(static_cast<void *>(gpuDiag));
         }
@@ -1586,7 +1565,7 @@ std::vector<Ciphertext<DCRTPoly>> GPUHydiaHelper::EvalOnDemandBSGSLazyChebyshevB
         // batched index path can still produce undecodable host ciphertexts
         // when multiple per-matrix post-Chebyshev results remain live on the
         // GPU. Use a conservative matrix-by-matrix execution/download path for
-        // correctness. This preserves the v1 fast path below unchanged.
+        // correctness.
         std::cout << "[GPUHydiaHelper] A81 v2 index path: serial matrix-by-matrix download for correctness" << std::endl;
         for (size_t m = 0; m < numMatrices; ++m)
         {
@@ -1607,64 +1586,6 @@ std::vector<Ciphertext<DCRTPoly>> GPUHydiaHelper::EvalOnDemandBSGSLazyChebyshevB
                 gpuChebResults[m] = nullptr;
             }
         }
-#if 0
-        effectiveStreams = streamsInitialized_
-                                      ? std::min(numMatrixStreams_, numMatrices)
-                                      : 1;
-
-        if (effectiveStreams > 1)
-        {
-            size_t totalWaves = (numMatrices + effectiveStreams - 1) / effectiveStreams;
-            std::cout << "[GPUHydiaHelper] 🚀 A81 Index Multi-stream: " << effectiveStreams
-                      << " concurrent streams for " << numMatrices << " matrices"
-                      << " (" << totalWaves << " wave" << (totalWaves > 1 ? "s" : "") << ")" << std::endl;
-            std::cout << "[CUDA Streams] batchSize=" << cc_->GetEncodingParams()->GetBatchSize()
-                      << ", numCKKSBatches=" << numMatrices
-                      << ", streamsAvailable=" << numMatrixStreams_
-                      << ", streamsUsed=" << effectiveStreams
-                      << " (" << (effectiveStreams * 100 / numMatrixStreams_) << "% utilization)" << std::endl;
-
-            size_t waveNum = 0;
-            for (size_t waveStart = 0; waveStart < numMatrices; waveStart += effectiveStreams)
-            {
-                size_t waveEnd = std::min(waveStart + effectiveStreams, numMatrices);
-                size_t waveSize = waveEnd - waveStart;
-                waveNum++;
-
-                std::cout << "[CUDA Streams] A81-Index Wave " << waveNum << "/" << totalWaves
-                          << ": matrices [" << waveStart << "-" << (waveEnd - 1) << "]"
-                          << " on " << waveSize << "/" << numMatrixStreams_ << " streams"
-                          << (waveSize < numMatrixStreams_ ? " (UNDERUTILIZED)" : " (FULL)")
-                          << std::endl;
-
-                for (size_t w = 0; w < waveSize; ++w)
-                {
-                    size_t m = waveStart + w;
-                    cudaStream_t stream = matrixStreams_[w % numMatrixStreams_];
-                    gpuChebResults[m] = static_cast<FIDESlib::CKKS::Ciphertext *>(
-                        ProcessMatrixOnStream(
-                            m, vectorDim, n1, numGiantSteps, delta, signDepth, stream));
-                }
-
-                for (size_t w = 0; w < waveSize; ++w)
-                {
-                    cudaStreamSynchronize(matrixStreams_[w % numMatrixStreams_]);
-                }
-            }
-        }
-        else
-        {
-            std::cout << "[GPUHydiaHelper] ⚠ A81 Index Single-stream mode (numMatrices=" << numMatrices
-                      << ") — no CUDA stream parallelism" << std::endl;
-            for (size_t m = 0; m < numMatrices; ++m)
-            {
-                gpuChebResults[m] = static_cast<FIDESlib::CKKS::Ciphertext *>(
-                    ProcessMatrixOnStream(
-                        m, vectorDim, n1, numGiantSteps, delta, signDepth, nullptr));
-            }
-            cudaDeviceSynchronize();
-        }
-#endif
 
         auto phase1End = std::chrono::steady_clock::now();
         double phase1Time = std::chrono::duration<double>(phase1End - phase1Start).count();
@@ -1682,23 +1603,6 @@ std::vector<Ciphertext<DCRTPoly>> GPUHydiaHelper::EvalOnDemandBSGSLazyChebyshevB
         GPU_PROFILE_START("A81_Batched_Phase2_BulkDownload");
 
         cudaDeviceSynchronize();
-
-#if 0
-        std::vector<Ciphertext<DCRTPoly>> results(numMatrices);
-
-        for (size_t m = 0; m < numMatrices; ++m)
-        {
-            if (gpuChebResults[m])
-            {
-                FIDESlib::CKKS::RawCipherText rawResult;
-                gpuChebResults[m]->store(rawResult);
-                results[m] = templateCt->Clone();
-                FIDESlib::CKKS::GetOpenFHECipherText(results[m], rawResult);
-                delete gpuChebResults[m];
-            }
-        }
-#endif
-
         GPU_TRACK_GPU_TO_CPU(ctSizeBytes * numMatrices, "CKKS::Ciphertext[]", "A81 bulk download all matrices");
 
         GPU_PROFILE_END("A81_Batched_Phase2_BulkDownload");
