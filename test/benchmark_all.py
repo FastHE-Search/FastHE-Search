@@ -76,7 +76,7 @@ CPU_APPROACHES = [5, 8]  # Approaches available in CPU build (OpenFHE v1.3.0)
 GPU_APPROACHES = [
     51,
     81,
-]  # Approaches available in GPU build (OpenFHE v1.2.3 optimized)
+]  # Approaches available in GPU build (OpenFHE v1.4.2 optimized)
 
 # Output order for results
 OUTPUT_ORDER = [5, 8, 51, 81]
@@ -86,7 +86,7 @@ BSGS_MULT_DEPTH = 11
 BSGS_SCALE_FACTOR = 45
 
 # Build type display names
-BUILD_TYPE_NAMES = {"CPU": "OpenFHE_v1.3.0", "GPU": "OpenFHE_v1.2.3_optimized"}
+BUILD_TYPE_NAMES = {"CPU": "OpenFHE_v1.3.0", "GPU": "OpenFHE_v1.4.2_optimized"}
 
 # Approach full names
 APPROACH_NAMES = {

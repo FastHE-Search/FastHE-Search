@@ -239,7 +239,7 @@ build_fideslib() {
     local cuda_arches
     cuda_arches="$(detect_cuda_architectures)"
 
-    echo -e "${YELLOW}Configuring FIDESlib (this will build OpenFHE 1.2.3 with -O3 -march=native)...${NC}"
+    echo -e "${YELLOW}Configuring FIDESlib (this will build OpenFHE 1.4.2 with -O3 -march=native)...${NC}"
     echo -e "${YELLOW}This may take several minutes on first build...${NC}"
     mkdir -p "$FIDESLIB_DIR/openfhe-install" || true
 
@@ -341,7 +341,7 @@ build_gpu() {
     cmake --build "$BUILD_DIR" -j"$JOBS" || exit 1
 
     echo -e "${GREEN}✓ GPU build complete!${NC}"
-    echo -e "${GREEN}OpenFHE Version: 1.2.3 (FIDESlib-patched, -O3 -march=native)${NC}"
+    echo -e "${GREEN}OpenFHE Version: 1.4.2 (FIDESlib-patched, -O3 -march=native)${NC}"
     echo -e "${GREEN}Supported approaches: 1-11, 51, 81 (51 HyDia-GPU, 81 BSGS-GPU)${NC}"
     echo ""
     echo "Run with: ./run_hydia.sh test/test_1024_k10.dat 9 11 45"

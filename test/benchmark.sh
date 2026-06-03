@@ -141,7 +141,7 @@ for arg in "$@"; do
             echo ""
             echo "Build modes:"
             echo "  cpu      Build with OpenFHE v1.3.0 and run benchmark"
-            echo "  gpu      Build with OpenFHE v1.2.3 (optimized) and run benchmark"
+            echo "  gpu      Build with FIDESlib's patched OpenFHE v1.4.2 (optimized) and run benchmark"
             echo "  both     Build and benchmark both OpenFHE versions"
             echo "  current  Run benchmark with current build (default)"
             echo ""

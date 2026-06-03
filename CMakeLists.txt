@@ -69,10 +69,10 @@ set(FIDESLIB_ROOT
     CACHE PATH "Path to the FIDESlib source tree")
 
 if(USE_GPU)
-  # GPU enabled: Use FIDESlib's patched OpenFHE 1.2.3 with -O3 -march=native
+  # GPU enabled: Use FIDESlib's patched OpenFHE with -O3 -march=native
   message(
     STATUS
-      "GPU enabled: Using FIDESlib's patched OpenFHE 1.2.3 with -O3 optimization"
+      "GPU enabled: Using FIDESlib's patched OpenFHE with -O3 optimization"
   )
 
   # FIDESlib's internal OpenFHE installation
