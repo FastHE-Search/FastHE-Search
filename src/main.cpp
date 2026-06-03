@@ -1,5 +1,7 @@
-//  Portions copyright (c) 2025 Sam Martin, Nirajan Koirala, Helena Berens,
-//  Micah Brody, Taeho Jung Portions copyright (c) 2026 LG Electronics, Inc.
+// clang-format off
+//
+//  Portions copyright (c) 2025 Sam Martin, Nirajan Koirala, Helena Berens, Micah Brody, Taeho Jung
+//  Portions copyright (c) 2026 LG Electronics, Inc.
 //
 //  Licensed under the MIT License (the "License"); you may not use this file
 //  except in compliance with the License.
@@ -10,6 +12,8 @@
 //  https://mit-license.org/
 //
 //  SPDX-License-Identifier: MIT
+//
+// clang-format on
 
 // ** Holds configuration parameters like file paths, default values, and any
 // other constant values
@@ -411,7 +415,6 @@ int main(int argc, char *argv[]) {
     parameters.SetMultiplicativeDepth(multDepth);
     parameters.SetScalingModSize(45);
     parameters.SetScalingTechnique(FIXEDMANUAL);
-    parameters.SetBatchSize(1024);
 
     cc = GenCryptoContext(parameters);
     cc->Enable(PKE);
@@ -787,6 +790,7 @@ int main(int argc, char *argv[]) {
       size_t ringDim = cc->GetRingDimension();
       size_t numLimbs =
           cc->GetCryptoParameters()->GetElementParams()->GetParams().size();
+
       size_t bytesPerCt = static_cast<size_t>(2 * numLimbs * ringDim * 8 * 2.5);
       size_t bytesPerKey = bytesPerCt * 3;
 
