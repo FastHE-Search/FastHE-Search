@@ -31,6 +31,7 @@
 # Ignore the benchmark_results directory and all its contents except the benchmark script
 benchmark_results/
 !benchmark_results/aggregate_benchmarks.py
+serial/
 
 # Generally ignore log and csv files
 **/*.log

@@ -88,19 +88,21 @@ RUN apt-get update && \
 RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb && \
     dpkg -i cuda-keyring_1.1-1_all.deb && \
     apt-get update && \
-    apt-get -y install -y cuda-toolkit-13-2 libtbb-dev && \
-    rm -rf /usr/local/cuda/bin/nvvp \
-        /usr/local/cuda/libnvvp \
-        /usr/local/cuda/doc \
-        /usr/local/cuda/samples && \
+    apt-get -y install --no-install-recommends -y cuda-toolkit-12-6 libtbb-dev libnccl2 libnccl-dev && \
+    rm -rf /usr/local/cuda/doc \
+           /usr/local/cuda/samples \
+           /usr/local/cuda/bin/nvvp \
+           /usr/local/cuda/libnvvp && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ENV PATH="/usr/local/cuda/bin:${PATH}"
-ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+ENV CUDA_HOME="/usr/local/cuda"
+ENV LD_LIBRARY_PATH="${CUDA_HOME}/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+ENV PATH="${CUDA_HOME}/bin:${PATH}"
+
 
 # -------------------------------------------------
-# 4. OpenFHE (pinned tag v1.2.3)
+# 4. OpenFHE (pinned to OFHE_VERSION)
 # -------------------------------------------------
 RUN git clone --depth 1 --branch ${OFHE_VERSION} \
     https://github.com/openfheorg/openfhe-development.git ${OFHE_DIR} && \
