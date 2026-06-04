@@ -18,22 +18,19 @@
 #include "sender_diag.h"
 
 class DiagonalBSGSSimpleSender : public DiagonalSender {
-public:
-  // constructor (no sk param - light-hydia's DiagonalSender doesn't take it)
-  DiagonalBSGSSimpleSender(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, 
-                           size_t vectorParam);
+  public:
+	// constructor (no sk param - light-hydia's DiagonalSender doesn't take it)
+	DiagonalBSGSSimpleSender(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
 
-  // public methods - override computeSimilarity with BSGS optimization
-  vector<Ciphertext<DCRTPoly>>
-  computeSimilarity(vector<Ciphertext<DCRTPoly>> &queryCipher) override;
+	// public methods - override computeSimilarity with BSGS optimization
+	vector<Ciphertext<DCRTPoly>> computeSimilarity(vector<Ciphertext<DCRTPoly>>& queryCipher) override;
 
-protected:
-  // Per-matrix incremental accumulation (matches light-hydia Approach 8)
-  // Uses per-thread running sums instead of allocating all 512 products
-  Ciphertext<DCRTPoly>
-  computeSimilarityMatrixPrecompOpt(vector<Ciphertext<DCRTPoly>> &rotatedQueryCipher, size_t matrix);
+  protected:
+	// Per-matrix incremental accumulation (matches light-hydia Approach 8)
+	// Uses per-thread running sums instead of allocating all 512 products
+	Ciphertext<DCRTPoly> computeSimilarityMatrixPrecompOpt(vector<Ciphertext<DCRTPoly>>& rotatedQueryCipher, size_t matrix);
 
-  // BSGS parameters (protected so GPU subclass can access)
-  size_t babyStepSize;
-  size_t giantStepSize;
+	// BSGS parameters (protected so GPU subclass can access)
+	size_t babyStepSize;
+	size_t giantStepSize;
 };

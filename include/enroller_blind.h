@@ -17,15 +17,14 @@
 
 #include "enroller_hers.h"
 
-class BlindEnroller : public HersEnroller
-{
-public:
-  // constructor
-  BlindEnroller(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
+class BlindEnroller : public HersEnroller {
+  public:
+	// constructor
+	BlindEnroller(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
 
-  // public methods
-  void serializeDB(vector<vector<double>> &database, size_t chunkLength);
+	// public methods
+	void serializeDB(vector<vector<double>>& database, size_t chunkLength);
 
-protected:
-  void serializeDBThread(vector<vector<double>> &database, size_t chunkLength, size_t matrix, size_t index);
+  protected:
+	void serializeDBThread(vector<vector<double>>& database, size_t chunkLength, size_t matrix, size_t index);
 };

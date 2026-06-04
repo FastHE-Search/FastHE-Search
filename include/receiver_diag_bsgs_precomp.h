@@ -16,10 +16,9 @@
 #include "receiver_diag.h"
 
 class DiagonalBSGSPrecompReceiver : public DiagonalReceiver {
-public:
-  // constructor
-  DiagonalBSGSPrecompReceiver(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam,
-              PrivateKey<DCRTPoly> skParam, size_t vectorParam);
+  public:
+	// constructor
+	DiagonalBSGSPrecompReceiver(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, PrivateKey<DCRTPoly> skParam, size_t vectorParam);
 
-  // The BSGS receiver uses the same query encryption as the standard diagonal receiver
+	// The BSGS receiver uses the same query encryption as the standard diagonal receiver
 };

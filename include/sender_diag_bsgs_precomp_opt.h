@@ -21,20 +21,18 @@
 #include "sender_diag.h"
 
 class DiagonalBSGSPrecompOptSender : public DiagonalSender {
-public:
-  // constructor
-  DiagonalBSGSPrecompOptSender(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
+  public:
+	// constructor
+	DiagonalBSGSPrecompOptSender(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
 
-  // public methods
-  vector<Ciphertext<DCRTPoly>>
-  computeSimilarity(vector<Ciphertext<DCRTPoly>> &queryCipher) override;
+	// public methods
+	vector<Ciphertext<DCRTPoly>> computeSimilarity(vector<Ciphertext<DCRTPoly>>& queryCipher) override;
 
-protected:
-  // Override computeSimilarityMatrix to use incremental accumulation
-  Ciphertext<DCRTPoly>
-  computeSimilarityMatrixPrecompOpt(vector<Ciphertext<DCRTPoly>> &rotatedQueryCipher, size_t matrix);
+  protected:
+	// Override computeSimilarityMatrix to use incremental accumulation
+	Ciphertext<DCRTPoly> computeSimilarityMatrixPrecompOpt(vector<Ciphertext<DCRTPoly>>& rotatedQueryCipher, size_t matrix);
 
-  // BSGS parameters
-  size_t babyStepSize;
-  size_t giantStepSize;
+	// BSGS parameters
+	size_t babyStepSize;
+	size_t giantStepSize;
 };

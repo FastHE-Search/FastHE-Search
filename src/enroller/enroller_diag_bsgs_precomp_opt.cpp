@@ -15,9 +15,9 @@
 
 // -------------------- CONSTRUCTOR --------------------
 
-DiagonalBSGSPrecompOptEnroller::DiagonalBSGSPrecompOptEnroller(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam,
-                                         size_t vectorParam)
-    : DiagonalEnroller(ccParam, pkParam, vectorParam) {}
+DiagonalBSGSPrecompOptEnroller::DiagonalBSGSPrecompOptEnroller(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam)
+: DiagonalEnroller(ccParam, pkParam, vectorParam) {
+}
 
 // Inherits all functionality from DiagonalEnroller
 // Database preprocessing is identical — only the sender-side computation differs

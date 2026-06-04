@@ -15,9 +15,9 @@
 
 // -------------------- CONSTRUCTOR --------------------
 
-DiagonalOrigBSGSEnroller::DiagonalOrigBSGSEnroller(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam,
-         size_t vectorParam)
-  : DiagonalEnroller(ccParam, pkParam, vectorParam) {}
+DiagonalOrigBSGSEnroller::DiagonalOrigBSGSEnroller(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam)
+: DiagonalEnroller(ccParam, pkParam, vectorParam) {
+}
 
 // The Original BSGS enroller inherits all functionality from DiagonalEnroller
 // Database preprocessing is identical - only the sender-side rotation strategy differs

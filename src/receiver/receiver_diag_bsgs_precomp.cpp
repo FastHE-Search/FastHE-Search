@@ -15,9 +15,9 @@
 
 // -------------------- CONSTRUCTOR --------------------
 
-DiagonalBSGSPrecompReceiver::DiagonalBSGSPrecompReceiver(CryptoContext<DCRTPoly> ccParam,
-                         PublicKey<DCRTPoly> pkParam, PrivateKey<DCRTPoly> skParam, size_t vectorParam)
-    : DiagonalReceiver(ccParam, pkParam, skParam, vectorParam) {}
+DiagonalBSGSPrecompReceiver::DiagonalBSGSPrecompReceiver(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, PrivateKey<DCRTPoly> skParam, size_t vectorParam)
+: DiagonalReceiver(ccParam, pkParam, skParam, vectorParam) {
+}
 
 // The BSGS receiver inherits all functionality from DiagonalReceiver
 // Query encryption is identical - only the sender-side rotation strategy differs

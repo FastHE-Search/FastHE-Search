@@ -17,15 +17,13 @@
 
 #include "receiver_hers.h"
 
-class BaseReceiver : public HersReceiver
-{
-public:
-  // constructor
-  BaseReceiver(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam,
-               PrivateKey<DCRTPoly> skParam, size_t vectorParam);
+class BaseReceiver : public HersReceiver {
+  public:
+	// constructor
+	BaseReceiver(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, PrivateKey<DCRTPoly> skParam, size_t vectorParam);
 
-  // public methods
-  vector<Ciphertext<DCRTPoly>> encryptQuery(vector<double> query) override;
+	// public methods
+	vector<Ciphertext<DCRTPoly>> encryptQuery(vector<double> query) override;
 
-protected:
+  protected:
 };

@@ -14,26 +14,24 @@
 
 #pragma once
 
+#include <cmath>
 #include <cstddef>
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <string>
 #include <vector>
-#include <cmath>
 
 using namespace std;
 
-namespace VectorUtils
-{
+namespace VectorUtils {
 
-    void concatenateVectors(vector<double> &dest, vector<double> source,
-                            int n);
+void concatenateVectors(vector<double>& dest, vector<double> source, int n);
 
-    double plaintextCosineSim(vector<double> x, vector<double> y);
+double plaintextCosineSim(vector<double> x, vector<double> y);
 
-    double plaintextMagnitude(vector<double> x, int vectorDim);
+double plaintextMagnitude(vector<double> x, int vectorDim);
 
-    vector<double> plaintextNormalize(vector<double> x, int vectorDim);
+vector<double> plaintextNormalize(vector<double> x, int vectorDim);
 
-    double plaintextInnerProduct(vector<double> x, vector<double> y, int vectorDim);
+double plaintextInnerProduct(vector<double> x, vector<double> y, int vectorDim);
 } // namespace VectorUtils

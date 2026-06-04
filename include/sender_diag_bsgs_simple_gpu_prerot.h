@@ -26,20 +26,17 @@
 #include "sender_diag_bsgs_simple_gpu.h"
 
 class DiagonalBSGSSimpleSenderGPU812 : public DiagonalBSGSSimpleSenderGPU {
-public:
-  DiagonalBSGSSimpleSenderGPU812(CryptoContext<DCRTPoly> ccParam,
-                                  PublicKey<DCRTPoly> pkParam,
-                                  size_t vectorParam,
-                                  GPUHydiaHelper* gpuHelper);
+  public:
+	DiagonalBSGSSimpleSenderGPU812(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam, GPUHydiaHelper* gpuHelper);
 
-  /// Initialize GPU cache using pre-rotated diagonals loaded from files (bulk mode)
-  void initializeGPUCache();
-  void initializeGPUCache(const std::vector<Ciphertext<DCRTPoly>>& preloadedDiagonals);
+	/// Initialize GPU cache using pre-rotated diagonals loaded from files (bulk mode)
+	void initializeGPUCache();
+	void initializeGPUCache(const std::vector<Ciphertext<DCRTPoly>>& preloadedDiagonals);
 
-  /// Stream pre-rotated diagonals from disk → GPU (no rotation on GPU)
-  void streamDiagonalsFromDisk(const std::string& serialDir);
+	/// Stream pre-rotated diagonals from disk → GPU (no rotation on GPU)
+	void streamDiagonalsFromDisk(const std::string& serialDir);
 
-private:
-  void cacheDiagonalsOnGPU();
-  void cacheDiagonalsOnGPU(const std::vector<Ciphertext<DCRTPoly>>& preloadedDiagonals);
+  private:
+	void cacheDiagonalsOnGPU();
+	void cacheDiagonalsOnGPU(const std::vector<Ciphertext<DCRTPoly>>& preloadedDiagonals);
 };

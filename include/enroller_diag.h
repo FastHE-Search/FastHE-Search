@@ -17,24 +17,23 @@
 
 #include "enroller_hers.h"
 
-class DiagonalEnroller : public HersEnroller
-{
-public:
-  // constructor
-  DiagonalEnroller(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
+class DiagonalEnroller : public HersEnroller {
+  public:
+	// constructor
+	DiagonalEnroller(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
 
-  // public methods
-  void serializeDB(vector<vector<double>> &database);
+	// public methods
+	void serializeDB(vector<vector<double>>& database);
 
-protected:
-  // protected methods
-  vector<vector<vector<double>>> splitIntoSquareMatrices(vector<vector<double>> &matrix, size_t k);
+  protected:
+	// protected methods
+	vector<vector<vector<double>>> splitIntoSquareMatrices(vector<vector<double>>& matrix, size_t k);
 
-  void printMatrix(vector<vector<double>> matrix);
+	void printMatrix(vector<vector<double>> matrix);
 
-  vector<vector<double>> preprocessToDiagonalForm(vector<vector<double>> &matrix);
+	vector<vector<double>> preprocessToDiagonalForm(vector<vector<double>>& matrix);
 
-  vector<vector<double>> concatenateRows(const vector<vector<vector<double>>> &matrices);
+	vector<vector<double>> concatenateRows(const vector<vector<vector<double>>>& matrices);
 
-  void serializeDBThread(vector<double> &currentRows, size_t index);
+	void serializeDBThread(vector<double>& currentRows, size_t index);
 };

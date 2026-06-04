@@ -16,6 +16,6 @@
 
 // -------------------- CONSTRUCTOR --------------------
 
-Receiver::Receiver(CryptoContext<DCRTPoly> ccParam,
-                   PublicKey<DCRTPoly> pkParam, PrivateKey<DCRTPoly> skParam, size_t vectorParam)
-    : cc(ccParam), pk(pkParam), sk(skParam), numVectors(vectorParam) {}
+Receiver::Receiver(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, PrivateKey<DCRTPoly> skParam, size_t vectorParam)
+: cc(ccParam), pk(pkParam), sk(skParam), numVectors(vectorParam) {
+}

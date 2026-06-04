@@ -17,10 +17,10 @@
 #include "enroller_diag.h"
 
 class DiagonalOrigBSGSEnroller : public DiagonalEnroller {
-public:
-  // constructor
-  DiagonalOrigBSGSEnroller(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
+  public:
+	// constructor
+	DiagonalOrigBSGSEnroller(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
 
-  // The Original BSGS enroller uses the same database preprocessing as the standard diagonal enroller
-  // The only difference is in the rotation key generation and sender-side computation
+	// The Original BSGS enroller uses the same database preprocessing as the standard diagonal enroller
+	// The only difference is in the rotation key generation and sender-side computation
 };

@@ -17,16 +17,15 @@
 #include "sender_diag.h"
 
 class DiagonalBSGSPrecompSender : public DiagonalSender {
-public:
-  // constructor
-  DiagonalBSGSPrecompSender(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
+  public:
+	// constructor
+	DiagonalBSGSPrecompSender(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
 
-  // public methods
-  vector<Ciphertext<DCRTPoly>>
-  computeSimilarity(vector<Ciphertext<DCRTPoly>> &queryCipher) override;
+	// public methods
+	vector<Ciphertext<DCRTPoly>> computeSimilarity(vector<Ciphertext<DCRTPoly>>& queryCipher) override;
 
-private:
-  // BSGS parameters
-  size_t babyStepSize;
-  size_t giantStepSize;
+  private:
+	// BSGS parameters
+	size_t babyStepSize;
+	size_t giantStepSize;
 };

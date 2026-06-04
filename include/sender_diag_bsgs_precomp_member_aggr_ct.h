@@ -43,19 +43,15 @@
 #include "sender_diag_bsgs_precomp_opt.h"
 
 class DiagonalBSGSPrecompMemberAggrCtSender : public DiagonalBSGSPrecompOptSender {
-public:
-  // constructor
-  DiagonalBSGSPrecompMemberAggrCtSender(CryptoContext<DCRTPoly> ccParam,
-                                          PublicKey<DCRTPoly> pkParam,
-                                          size_t vectorParam);
+  public:
+	// constructor
+	DiagonalBSGSPrecompMemberAggrCtSender(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
 
-  // Override membershipScenario with the fused diagonal-sum optimization
-  Ciphertext<DCRTPoly>
-  membershipScenario(vector<Ciphertext<DCRTPoly>> &queryCipher) override;
+	// Override membershipScenario with the fused diagonal-sum optimization
+	Ciphertext<DCRTPoly> membershipScenario(vector<Ciphertext<DCRTPoly>>& queryCipher) override;
 
-private:
-  // Compute the membership similarity by summing diagonals across matrices
-  // before multiplying by rotated query vectors
-  Ciphertext<DCRTPoly>
-  computeMembershipFused(vector<Ciphertext<DCRTPoly>> &rotatedQueryCipher, size_t numMatrices);
+  private:
+	// Compute the membership similarity by summing diagonals across matrices
+	// before multiplying by rotated query vectors
+	Ciphertext<DCRTPoly> computeMembershipFused(vector<Ciphertext<DCRTPoly>>& rotatedQueryCipher, size_t numMatrices);
 };

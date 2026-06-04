@@ -11,7 +11,7 @@
 //  SPDX-License-Identifier: MIT
 // ** sender_diag_bsgs_simple_gpu.h: GPU-accelerated Simple BSGS sender (Approach 81)
 // GPU version using lazy-relin BSGS on GPU with pre-rotated diagonals.
-// 
+//
 // Pipeline:
 // 1. Pre-rotate and cache diagonals on GPU (one-time setup)
 // 2. Upload query baby-step rotations to GPU
@@ -27,44 +27,39 @@
 class GPUHydiaHelper;
 
 class DiagonalBSGSSimpleSenderGPU : public DiagonalBSGSSimpleSender {
-public:
-  // Constructor (no sk param - light-hydia's DiagonalSender doesn't take it)
-  DiagonalBSGSSimpleSenderGPU(CryptoContext<DCRTPoly> ccParam, 
-                               PublicKey<DCRTPoly> pkParam, 
-                               size_t vectorParam,
-                               GPUHydiaHelper* gpuHelper);
-  
-  // Destructor
-  ~DiagonalBSGSSimpleSenderGPU();
+  public:
+	// Constructor (no sk param - light-hydia's DiagonalSender doesn't take it)
+	DiagonalBSGSSimpleSenderGPU(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam, GPUHydiaHelper* gpuHelper);
 
-  // Override membershipScenario to use GPU
-  Ciphertext<DCRTPoly> 
-  membershipScenario(vector<Ciphertext<DCRTPoly>> &queryCipher) override;
+	// Destructor
+	~DiagonalBSGSSimpleSenderGPU();
 
-  // Override indexScenario to use GPU
-  vector<Ciphertext<DCRTPoly>> 
-  indexScenario(vector<Ciphertext<DCRTPoly>> &queryCipher) override;
+	// Override membershipScenario to use GPU
+	Ciphertext<DCRTPoly> membershipScenario(vector<Ciphertext<DCRTPoly>>& queryCipher) override;
 
-  // Initialize GPU caching (call once before queries)
-  void initializeGPUCache();
-  
-  // Initialize GPU caching with preloaded diagonals (avoids file I/O)
-  void initializeGPUCache(const vector<Ciphertext<DCRTPoly>>& preloadedDiagonals);
-  
-  // Stream diagonals from disk directly to GPU (one-by-one, saves ~15 GB CPU RAM)
-  void streamDiagonalsFromDisk(const std::string& serialDir);
+	// Override indexScenario to use GPU
+	vector<Ciphertext<DCRTPoly>> indexScenario(vector<Ciphertext<DCRTPoly>>& queryCipher) override;
 
-  // Check if GPU is ready
-  bool isGPUReady() const;
+	// Initialize GPU caching (call once before queries)
+	void initializeGPUCache();
 
-protected:
-  GPUHydiaHelper* gpuHelper_;
-  bool gpuCacheInitialized_;
-  bool rotationsCached_;
-  Ciphertext<DCRTPoly> queryCipherForClone_;
+	// Initialize GPU caching with preloaded diagonals (avoids file I/O)
+	void initializeGPUCache(const vector<Ciphertext<DCRTPoly>>& preloadedDiagonals);
 
-private:
-  // Load and cache diagonals on GPU (same format as Approach 5/9)
-  void cacheDiagonalsOnGPU();
-  void cacheDiagonalsOnGPU(const vector<Ciphertext<DCRTPoly>>& preloadedDiagonals);
+	// Stream diagonals from disk directly to GPU (one-by-one, saves ~15 GB CPU RAM)
+	void streamDiagonalsFromDisk(const std::string& serialDir);
+
+	// Check if GPU is ready
+	bool isGPUReady() const;
+
+  protected:
+	GPUHydiaHelper* gpuHelper_;
+	bool gpuCacheInitialized_;
+	bool rotationsCached_;
+	Ciphertext<DCRTPoly> queryCipherForClone_;
+
+  private:
+	// Load and cache diagonals on GPU (same format as Approach 5/9)
+	void cacheDiagonalsOnGPU();
+	void cacheDiagonalsOnGPU(const vector<Ciphertext<DCRTPoly>>& preloadedDiagonals);
 };

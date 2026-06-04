@@ -16,6 +16,5 @@
 
 // -------------------- CONSTRUCTOR --------------------
 
-Sender::Sender(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam,
-               size_t vectorParam)
-    : cc(ccParam), pk(pkParam), numVectors(vectorParam) {}
+Sender::Sender(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam) : cc(ccParam), pk(pkParam), numVectors(vectorParam) {
+}

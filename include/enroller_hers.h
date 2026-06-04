@@ -19,31 +19,30 @@
 #include "../include/openFHE_wrapper.h"
 #include "../include/vector_utils.h"
 #include "openfhe.h"
-#include <vector>
 #include <filesystem>
+#include <vector>
 
 using namespace lbcrypto;
 using namespace std;
 
-class HersEnroller
-{
-public:
-  // constructor
-  HersEnroller(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
+class HersEnroller {
+  public:
+	// constructor
+	HersEnroller(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
 
-  // public methods
-  vector<vector<Ciphertext<DCRTPoly>>> encryptDB(vector<vector<double>> &database);
+	// public methods
+	vector<vector<Ciphertext<DCRTPoly>>> encryptDB(vector<vector<double>>& database);
 
-  void serializeDB(vector<vector<double>> &database);
+	void serializeDB(vector<vector<double>>& database);
 
-protected:
-  // private members
-  CryptoContext<DCRTPoly> cc;
-  PublicKey<DCRTPoly> pk;
-  size_t numVectors;
+  protected:
+	// private members
+	CryptoContext<DCRTPoly> cc;
+	PublicKey<DCRTPoly> pk;
+	size_t numVectors;
 
-  // private functions
-  Ciphertext<DCRTPoly> encryptDBThread(size_t matrix, size_t index, vector<vector<double>> &database);
+	// private functions
+	Ciphertext<DCRTPoly> encryptDBThread(size_t matrix, size_t index, vector<vector<double>>& database);
 
-  void serializeDBThread(size_t matrix, size_t index, vector<vector<double>> &database);
+	void serializeDBThread(size_t matrix, size_t index, vector<vector<double>>& database);
 };

@@ -16,12 +16,11 @@
 #include "receiver_diag.h"
 
 class DiagonalBSGSPrecompOptReceiver : public DiagonalReceiver {
-public:
-  // constructor
-  DiagonalBSGSPrecompOptReceiver(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam,
-                      PrivateKey<DCRTPoly> skParam, size_t vectorParam);
+  public:
+	// constructor
+	DiagonalBSGSPrecompOptReceiver(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, PrivateKey<DCRTPoly> skParam, size_t vectorParam);
 
-  bool decryptMembership(Ciphertext<DCRTPoly> &membershipCipher) override;
+	bool decryptMembership(Ciphertext<DCRTPoly>& membershipCipher) override;
 
-  // Inherits all methods from DiagonalReceiver — same query encryption
+	// Inherits all methods from DiagonalReceiver — same query encryption
 };

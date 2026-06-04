@@ -30,20 +30,18 @@
 #include <cmath>
 
 class DiagonalBSGSPreRotEnroller : public DiagonalEnroller {
-public:
-  DiagonalBSGSPreRotEnroller(CryptoContext<DCRTPoly> ccParam,
-                              PublicKey<DCRTPoly> pkParam,
-                              size_t vectorParam);
+  public:
+	DiagonalBSGSPreRotEnroller(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
 
-  /// Serialize database with plaintext pre-rotation of diagonals.
-  void serializeDB(vector<vector<double>> &database);
+	/// Serialize database with plaintext pre-rotation of diagonals.
+	void serializeDB(vector<vector<double>>& database);
 
-protected:
-  size_t babyStepSize_;
-  size_t giantStepSize_;
+  protected:
+	size_t babyStepSize_;
+	size_t giantStepSize_;
 
-  /// Apply CKKS-slot-level cyclic left-shift to a plaintext row.
-  /// Within each VECTOR_DIM block, shifts by `amount` positions cyclically.
-  /// Multiple blocks (numSlots / VECTOR_DIM) are each shifted independently.
-  static void applyPlaintextRotation(vector<double>& row, int amount, size_t vectorDim);
+	/// Apply CKKS-slot-level cyclic left-shift to a plaintext row.
+	/// Within each VECTOR_DIM block, shifts by `amount` positions cyclically.
+	/// Multiple blocks (numSlots / VECTOR_DIM) are each shifted independently.
+	static void applyPlaintextRotation(vector<double>& row, int amount, size_t vectorDim);
 };

@@ -15,19 +15,19 @@
 
 // -------------------- CONSTRUCTOR --------------------
 
-DiagonalBSGSPrecompOptReceiver::DiagonalBSGSPrecompOptReceiver(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam,
-                                       PrivateKey<DCRTPoly> skParam, size_t vectorParam)
-    : DiagonalReceiver(ccParam, pkParam, skParam, vectorParam) {}
+DiagonalBSGSPrecompOptReceiver::DiagonalBSGSPrecompOptReceiver(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, PrivateKey<DCRTPoly> skParam, size_t vectorParam)
+: DiagonalReceiver(ccParam, pkParam, skParam, vectorParam) {
+}
 
-bool DiagonalBSGSPrecompOptReceiver::decryptMembership(Ciphertext<DCRTPoly> &membershipCipher) {
+bool DiagonalBSGSPrecompOptReceiver::decryptMembership(Ciphertext<DCRTPoly>& membershipCipher) {
 
-    vector<double> membershipValues = OpenFHEWrapper::decryptToVector(cc, sk, membershipCipher);
+	vector<double> membershipValues = OpenFHEWrapper::decryptToVector(cc, sk, membershipCipher);
 
-    for (double value : membershipValues) {
-        if (value >= 1.0) {
-            return true;
-        }
-    }
+	for (double value : membershipValues) {
+		if (value >= 1.0) {
+			return true;
+		}
+	}
 
-    return false;
+	return false;
 }

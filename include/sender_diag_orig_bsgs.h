@@ -20,29 +20,23 @@
 #include "sender_diag.h"
 
 class DiagonalOrigBSGSSender : public DiagonalSender {
-public:
-  // constructor
-  DiagonalOrigBSGSSender(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
+  public:
+	// constructor
+	DiagonalOrigBSGSSender(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
 
-  // public methods
-  vector<Ciphertext<DCRTPoly>>
-  computeSimilarity(vector<Ciphertext<DCRTPoly>> &queryCipher) override;
+	// public methods
+	vector<Ciphertext<DCRTPoly>> computeSimilarity(vector<Ciphertext<DCRTPoly>>& queryCipher) override;
 
-protected:
-  // Override computeSimilarityMatrix to use BSGS on-the-fly combination with hoisting
-  Ciphertext<DCRTPoly> computeSimilarityMatrixBSGS(
-      vector<Ciphertext<DCRTPoly>> &babySteps,
-      vector<shared_ptr<vector<DCRTPoly>>> &babyStepsPrecomp,
-      size_t matrix);
+  protected:
+	// Override computeSimilarityMatrix to use BSGS on-the-fly combination with hoisting
+	Ciphertext<DCRTPoly> computeSimilarityMatrixBSGS(vector<Ciphertext<DCRTPoly>>& babySteps, vector<shared_ptr<vector<DCRTPoly>>>& babyStepsPrecomp, size_t matrix);
 
-  // Compute similarity for a single diagonal using BSGS with hoisting
-  Ciphertext<DCRTPoly> computeSimilarityThreadBSGS(
-      vector<Ciphertext<DCRTPoly>> &babySteps,
-      vector<shared_ptr<vector<DCRTPoly>>> &babyStepsPrecomp,
-      size_t matrix, size_t diagonalIndex);
+	// Compute similarity for a single diagonal using BSGS with hoisting
+	Ciphertext<DCRTPoly>
+	computeSimilarityThreadBSGS(vector<Ciphertext<DCRTPoly>>& babySteps, vector<shared_ptr<vector<DCRTPoly>>>& babyStepsPrecomp, size_t matrix, size_t diagonalIndex);
 
-private:
-  // BSGS parameters
-  size_t babyStepSize;
-  size_t giantStepSize;
+  private:
+	// BSGS parameters
+	size_t babyStepSize;
+	size_t giantStepSize;
 };

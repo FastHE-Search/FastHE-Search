@@ -17,13 +17,11 @@
 
 #include "receiver_base.h"
 
-class GroteReceiver : public BaseReceiver
-{
-public:
-  // constructor
-  GroteReceiver(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam,
-                PrivateKey<DCRTPoly> skParam, size_t vectorParam);
+class GroteReceiver : public BaseReceiver {
+  public:
+	// constructor
+	GroteReceiver(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, PrivateKey<DCRTPoly> skParam, size_t vectorParam);
 
-  // public methods
-  vector<size_t> decryptIndex(vector<Ciphertext<DCRTPoly>> &indexCipher);
+	// public methods
+	vector<size_t> decryptIndex(vector<Ciphertext<DCRTPoly>>& indexCipher);
 };

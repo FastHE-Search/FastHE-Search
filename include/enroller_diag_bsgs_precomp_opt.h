@@ -19,9 +19,9 @@
 #include "enroller_diag.h"
 
 class DiagonalBSGSPrecompOptEnroller : public DiagonalEnroller {
-public:
-  // constructor
-  DiagonalBSGSPrecompOptEnroller(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
+  public:
+	// constructor
+	DiagonalBSGSPrecompOptEnroller(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam);
 
-  // Inherits all methods from DiagonalEnroller — same database preprocessing
+	// Inherits all methods from DiagonalEnroller — same database preprocessing
 };

@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include <string>
 #include <cstdlib>
+#include <string>
 
 // similarity threshold value used to determine a match between vectors
 const double MATCH_THRESHOLD = 0.44;
@@ -53,18 +53,15 @@ const size_t DEFAULT_MAX_NUM_CORES = 48;
 extern size_t MAX_NUM_CORES;
 
 // Function to initialize threading configuration from environment variables
-inline size_t getMaxNumCores()
-{
-    const char *outer_threads = std::getenv("OUTER_THREADS");
-    if (outer_threads != nullptr)
-    {
-        int threads = std::atoi(outer_threads);
-        if (threads > 0)
-        {
-            return static_cast<size_t>(threads);
-        }
-    }
-    return DEFAULT_MAX_NUM_CORES;
+inline size_t getMaxNumCores() {
+	const char* outer_threads = std::getenv("OUTER_THREADS");
+	if (outer_threads != nullptr) {
+		int threads = std::atoi(outer_threads);
+		if (threads > 0) {
+			return static_cast<size_t>(threads);
+		}
+	}
+	return DEFAULT_MAX_NUM_CORES;
 }
 
 // ---------- Variables below should not be changed ----------

@@ -24,33 +24,28 @@ class GPUHydiaHelper;
  * lazy GPU pipeline while preserving all existing approaches unchanged.
  */
 class DiagonalSenderGPU : public DiagonalSender {
-public:
-  DiagonalSenderGPU(CryptoContext<DCRTPoly> ccParam,
-                    PublicKey<DCRTPoly> pkParam,
-                    size_t vectorParam,
-                    GPUHydiaHelper* gpuHelper);
+  public:
+	DiagonalSenderGPU(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam, GPUHydiaHelper* gpuHelper);
 
-  ~DiagonalSenderGPU();
+	~DiagonalSenderGPU();
 
-  Ciphertext<DCRTPoly>
-  membershipScenario(vector<Ciphertext<DCRTPoly>> &queryCipher) override;
+	Ciphertext<DCRTPoly> membershipScenario(vector<Ciphertext<DCRTPoly>>& queryCipher) override;
 
-  vector<Ciphertext<DCRTPoly>>
-  indexScenario(vector<Ciphertext<DCRTPoly>> &queryCipher) override;
+	vector<Ciphertext<DCRTPoly>> indexScenario(vector<Ciphertext<DCRTPoly>>& queryCipher) override;
 
-  void initializeGPUCache();
-  void initializeGPUCache(const vector<Ciphertext<DCRTPoly>>& preloadedDiagonals);
+	void initializeGPUCache();
+	void initializeGPUCache(const vector<Ciphertext<DCRTPoly>>& preloadedDiagonals);
 
-  // Stream diagonals from disk directly to GPU (one-by-one, saves ~15 GB CPU RAM)
-  void streamDiagonalsFromDisk(const std::string& serialDir);
+	// Stream diagonals from disk directly to GPU (one-by-one, saves ~15 GB CPU RAM)
+	void streamDiagonalsFromDisk(const std::string& serialDir);
 
-  bool isGPUReady() const;
+	bool isGPUReady() const;
 
-private:
-  GPUHydiaHelper* gpuHelper_;
-  bool gpuCacheInitialized_;
-  Ciphertext<DCRTPoly> queryCipherForClone_;
+  private:
+	GPUHydiaHelper* gpuHelper_;
+	bool gpuCacheInitialized_;
+	Ciphertext<DCRTPoly> queryCipherForClone_;
 
-  void cacheDiagonalsOnGPU();
-  void cacheDiagonalsOnGPU(const vector<Ciphertext<DCRTPoly>>& preloadedDiagonals);
+	void cacheDiagonalsOnGPU();
+	void cacheDiagonalsOnGPU(const vector<Ciphertext<DCRTPoly>>& preloadedDiagonals);
 };

@@ -16,75 +16,65 @@
 
 // -------------------- CONSTRUCTOR --------------------
 
-BlindReceiver::BlindReceiver(CryptoContext<DCRTPoly> ccParam,
-                             PublicKey<DCRTPoly> pkParam, PrivateKey<DCRTPoly> skParam, size_t vectorParam)
-    : HersReceiver(ccParam, pkParam, skParam, vectorParam) {}
+BlindReceiver::BlindReceiver(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, PrivateKey<DCRTPoly> skParam, size_t vectorParam)
+: HersReceiver(ccParam, pkParam, skParam, vectorParam) {
+}
 
 // -------------------- PUBLIC FUNCTIONS --------------------
 
-vector<Ciphertext<DCRTPoly>> BlindReceiver::encryptQuery(vector<double> query)
-{
+vector<Ciphertext<DCRTPoly>> BlindReceiver::encryptQuery(vector<double> query) {
 
-  size_t chunksPerVector = VECTOR_DIM / CHUNK_LEN; // number of chunks a 512-d vector is split into
+	size_t chunksPerVector = VECTOR_DIM / CHUNK_LEN; // number of chunks a 512-d vector is split into
 
-  query = VectorUtils::plaintextNormalize(query, VECTOR_DIM);
+	query = VectorUtils::plaintextNormalize(query, VECTOR_DIM);
 
-  vector<Ciphertext<DCRTPoly>> queryVector(chunksPerVector);
+	vector<Ciphertext<DCRTPoly>> queryVector(chunksPerVector);
 #pragma omp parallel for num_threads(MAX_NUM_CORES)
-  for (size_t i = 0; i < chunksPerVector; i++)
-  {
-    queryVector[i] = encryptQueryThread(query, CHUNK_LEN, (i * CHUNK_LEN));
-  }
+	for (size_t i = 0; i < chunksPerVector; i++) {
+		queryVector[i] = encryptQueryThread(query, CHUNK_LEN, (i * CHUNK_LEN));
+	}
 
-  return queryVector;
+	return queryVector;
 }
 
-vector<size_t> BlindReceiver::decryptIndex(vector<Ciphertext<DCRTPoly>> &indexCipher)
-{
+vector<size_t> BlindReceiver::decryptIndex(vector<Ciphertext<DCRTPoly>>& indexCipher) {
 
-  size_t batchSize = cc->GetEncodingParams()->GetBatchSize();
-  size_t scoresPerBatch = batchSize / CHUNK_LEN;
+	size_t batchSize	  = cc->GetEncodingParams()->GetBatchSize();
+	size_t scoresPerBatch = batchSize / CHUNK_LEN;
 
-  vector<size_t> outputValues;
-  vector<double> indexValues;
-  size_t batchStartingIndex, chunkStartingIndex, mergedChunkIndex;
+	vector<size_t> outputValues;
+	vector<double> indexValues;
+	size_t batchStartingIndex, chunkStartingIndex, mergedChunkIndex;
 
-  // Determine match indices according to pattern created by compression operation
-  for (size_t i = 0; i < indexCipher.size(); i++)
-  {
-    indexValues = OpenFHEWrapper::decryptToVector(cc, sk, indexCipher[i]);
+	// Determine match indices according to pattern created by compression operation
+	for (size_t i = 0; i < indexCipher.size(); i++) {
+		indexValues = OpenFHEWrapper::decryptToVector(cc, sk, indexCipher[i]);
 
-    for (size_t j = 0; j < batchSize; j++)
-    {
-      // If match is found during iterataion, append to returned list
-      if (indexValues[j] >= 1.0)
-      {
-        batchStartingIndex = i * batchSize;
-        chunkStartingIndex = j / CHUNK_LEN;
-        mergedChunkIndex = (j % CHUNK_LEN) * scoresPerBatch;
+		for (size_t j = 0; j < batchSize; j++) {
+			// If match is found during iterataion, append to returned list
+			if (indexValues[j] >= 1.0) {
+				batchStartingIndex = i * batchSize;
+				chunkStartingIndex = j / CHUNK_LEN;
+				mergedChunkIndex   = (j % CHUNK_LEN) * scoresPerBatch;
 
-        outputValues.push_back(batchStartingIndex + chunkStartingIndex + mergedChunkIndex);
-      }
-    }
-  }
+				outputValues.push_back(batchStartingIndex + chunkStartingIndex + mergedChunkIndex);
+			}
+		}
+	}
 
-  return outputValues;
+	return outputValues;
 }
 
 // -------------------- PROTECTED FUNCTIONS --------------------
 
-Ciphertext<DCRTPoly> BlindReceiver::encryptQueryThread(vector<double> &query, size_t chunkLength, size_t index)
-{
+Ciphertext<DCRTPoly> BlindReceiver::encryptQueryThread(vector<double>& query, size_t chunkLength, size_t index) {
 
-  size_t batchSize = cc->GetEncodingParams()->GetBatchSize();
-  vector<double> currentVector(batchSize);
+	size_t batchSize = cc->GetEncodingParams()->GetBatchSize();
+	vector<double> currentVector(batchSize);
 
-  for (size_t i = 0; i < batchSize; i += chunkLength)
-  {
-    copy(query.begin() + index,
-         query.begin() + index + chunkLength,
-         currentVector.begin() + i);
-  }
+	for (size_t i = 0; i < batchSize; i += chunkLength) {
+		copy(query.begin() + index, query.begin() + index + chunkLength, currentVector.begin() + i);
+	}
 
-  return OpenFHEWrapper::encryptFromVector(cc, pk, currentVector);
+	return OpenFHEWrapper::encryptFromVector(cc, pk, currentVector);
 }

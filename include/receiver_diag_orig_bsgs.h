@@ -16,10 +16,9 @@
 #include "receiver_diag.h"
 
 class DiagonalOrigBSGSReceiver : public DiagonalReceiver {
-public:
-  // constructor
-  DiagonalOrigBSGSReceiver(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam,
-              PrivateKey<DCRTPoly> skParam, size_t vectorParam);
+  public:
+	// constructor
+	DiagonalOrigBSGSReceiver(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, PrivateKey<DCRTPoly> skParam, size_t vectorParam);
 
-  // The Original BSGS receiver uses the same query encryption as the standard diagonal receiver
+	// The Original BSGS receiver uses the same query encryption as the standard diagonal receiver
 };
