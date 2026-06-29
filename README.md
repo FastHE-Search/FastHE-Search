@@ -13,12 +13,17 @@ https://mit-license.org/
 SPDX-License-Identifier: MIT
 -->
 
-# HyDia: FHE-based Facial Matching with Hybrid Approximations and Diagonalization
+# FastHE-Search: Lightweight, Practical Encrypted Face Recognition with GPU Support
 
-### PETS 2025 Artifact – README
+### Artifact – README
 
-This repository contains the full artifact (code + environment) for our PETS 2025 paper titled "HyDia: FHE-based Facial Matching with Hybrid Approximations and Diagonalization".
-Follow these steps below to  (1) build the Docker image, (2) run the five face‑matching approaches, (3) capture their latency/parameter output and (4) generate the figures present in the manuscript.
+FastHE-Search extends the [HyDia](https://github.com/n7koirala/image_matching) framework with a GPU backend featuring optimized CUDA kernels, bringing query latency from many seconds (CPU-only HyDia) to sub-second for certain database sizes. It also introduces Baby-Step Giant-Step (BSGS) matrix-vector products on top of HyDia, reducing VRAM requirements so that the encrypted database can remain resident in GPU memory.
+
+This repository contains the full artifact (code + environment) for our paper:
+
+> G. De Micheli, S. M. Hafiz, G. Pereira, E. L. Cominetti, T. B. Paiva, J. Choi, M. A. Simplicio Jr., and B. Yildiz, "Lightweight, Practical Encrypted Face Recognition with GPU Support," arXiv:2604.00546, 2026.
+
+Follow these steps below to (1) build the Docker image, (2) run the face‑matching approaches, (3) capture their latency/parameter output and (4) generate the figures present in the manuscript.
 
 ---
 
