@@ -86,7 +86,7 @@ class GPUHydiaHelper {
 	 * @param n1 Baby step size for BSGS pre-rotation
 	 * @return true if all diagonals loaded successfully
 	 */
-	bool StreamDiagonalsToGPU(const std::string& serialDir, size_t numDiagonals, size_t numMatrices, int n1);
+	bool StreamDiagonalsToGPU(const std::string& serialDir, size_t numDiagonals, size_t numMatrices, int n1, size_t fileIndexOffset = 0);
 
 	/**
 	 * Upload pre-rotated diagonals to GPU WITHOUT any homomorphic rotation.
@@ -106,7 +106,7 @@ class GPUHydiaHelper {
 	 * Like StreamDiagonalsToGPU but skips the rotate() call — the enroller already
 	 * applied the plaintext rotation before encryption (Approach 812).
 	 */
-	bool StreamPreRotatedDiagonalsToGPU(const std::string& serialDir, size_t numDiagonals, size_t numMatrices, int n1);
+	bool StreamPreRotatedDiagonalsToGPU(const std::string& serialDir, size_t numDiagonals, size_t numMatrices, int n1, size_t fileIndexOffset = 0);
 
 	bool areDiagonalsCached() const;
 
@@ -218,6 +218,25 @@ class GPUHydiaHelper {
 
 	// Unified GPU safe memory limit (GB) — single source of truth
 	double gpuSafeMemoryLimitGB_ = -1.0;
+
+	// =========================================================================
+	// MULTI-GPU DATABASE SHARDING (Approaches 81 & 812)
+	// =========================================================================
+	// When constructed with more than one GPU device, this helper becomes a
+	// thin COORDINATOR that owns one independent single-GPU child helper per
+	// device. The database matrices are split into contiguous shards (one per
+	// child); setup fans out to the children and queries run them in parallel
+	// (one host thread per shard) and merge the results on the CPU.
+	//
+	// Concurrency is safe because FIDESlib's currentContext is thread_local
+	// (each worker thread keeps its own current context) and each shard context
+	// maps to a distinct GPU.
+	bool isCoordinator_ = false;
+	std::vector<int> shardDevices_;
+	std::vector<std::unique_ptr<GPUHydiaHelper>> shardHelpers_;
+
+	// Balanced contiguous matrix ranges [start, end) for numShards shards.
+	std::vector<std::pair<size_t, size_t>> ComputeShardRanges(size_t numMatrices, size_t numShards) const;
 
 #ifdef USE_GPU_ACCELERATION
 	// GPU-specific members
