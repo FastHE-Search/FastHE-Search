@@ -882,7 +882,7 @@ int main(int argc, char* argv[]) {
 		KeyPair<DCRTPoly> keys;
 		keys.publicKey		   = pk;
 		keys.secretKey		   = sk;
-		vector<int> gpuDevices = { 0 };
+		vector<int> gpuDevices = gpuDeviceList;
 		gpuHelper			   = new GPUHydiaHelper(cc, keys, gpuDevices, batchSize);
 
 		if (!gpuHelper->isReady()) {
@@ -914,9 +914,13 @@ int main(int argc, char* argv[]) {
 			size_t bytesPerCt  = 2 * numLimbs * ringDim * 8 * 2.5;
 			size_t bytesPerKey = bytesPerCt * 3;
 
-			double diagMemGB  = (numDiagonals * bytesPerCt) / (1024.0 * 1024.0 * 1024.0);
-			double keyMemGB	  = (numRotationKeys * bytesPerKey) / (1024.0 * 1024.0 * 1024.0);
-			double totalMemGB = diagMemGB + keyMemGB;
+			double diagMemGB = (numDiagonals * bytesPerCt) / (1024.0 * 1024.0 * 1024.0);
+			double keyMemGB	= (numRotationKeys * bytesPerKey) / (1024.0 * 1024.0 * 1024.0);
+			// Per-GPU footprint: diagonals are sharded across GPUs, rotation keys
+			// are replicated on every GPU.
+			size_t numGpusShard	   = gpuDeviceList.size();
+			double diagMemPerGpuGB = diagMemGB / static_cast<double>(numGpusShard);
+			double totalMemGB	   = diagMemPerGpuGB + keyMemGB;
 
 			cout << "\n[BSGS-Simple-GPU] Memory estimation:" << endl;
 			cout << "  Diagonals:      " << numDiagonals << " x ~15MB = " << fixed << setprecision(2) << diagMemGB << " GB"
