@@ -127,7 +127,8 @@ GPUHydiaHelper::GPUHydiaHelper(CryptoContext<DCRTPoly> cc, const KeyPair<DCRTPol
 		bool allReady = true;
 		for (size_t s = 0; s < gpuDevices.size(); ++s) {
 			std::cout << "[GPUHydiaHelper] --- Initializing shard " << s << " on GPU " << gpuDevices[s] << " ---" << std::endl;
-			auto child = std::make_unique<GPUHydiaHelper>(cc_, keys_, std::vector<int>{ gpuDevices[s] }, batchSize_, gpuSafeMemoryLimitGB_);
+			cudaSetDevice(gpuDevices[s]);
+			auto child = std::make_unique<GPUHydiaHelper>(cc_, keys_, std::vector<int>{ gpuDevices[s] }, batchSize_, gpuSafeMemoryLimitGB);
 			if (!child->isReady()) {
 				std::cerr << "[GPUHydiaHelper] Shard " << s << " (GPU " << gpuDevices[s] << ") failed to initialize" << std::endl;
 				allReady = false;
