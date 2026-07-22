@@ -245,7 +245,7 @@ build_fideslib() {
 
     cmake -S "$FIDESLIB_DIR" -B "$FIDESLIB_DIR/build" \
           -DFIDESLIB_INSTALL_OPENFHE=ON \
-          -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_BUILD_TYPE=Release \
           -DFIDESLIB_ARCH="$cuda_arches" \
           -DOPENFHE_INSTALL_PREFIX="${FIDESLIB_DIR}/openfhe-install"
 
@@ -315,6 +315,11 @@ build_gpu() {
 
     echo -e "${GREEN}Using FIDESlib's patched OpenFHE: $FIDESLIB_OPENFHE${NC}"
 
+    local cuda_compiler="${CUDA_PATH:-/usr/local/cuda}/bin/nvcc"
+    if [ ! -x "$cuda_compiler" ]; then
+        cuda_compiler="$(command -v nvcc)"
+    fi
+
     mkdir -p "$BUILD_DIR"
     cd "$BUILD_DIR"
 
@@ -330,19 +335,30 @@ build_gpu() {
     echo -e "${YELLOW}Running CMake with GPU support (Release mode with -O3)...${NC}"
     cmake -DUSE_GPU=ON \
           -DFIDESLIB_ROOT="$FIDESLIB_DIR" \
-          -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CUDA_COMPILER="$cuda_compiler" \
+                    -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG" \
           -DCMAKE_CUDA_FLAGS_RELEASE="-O3" \
           -DCMAKE_CUDA_ARCHITECTURES="$cuda_arches" \
           -DCOMP_DEPTH_VAL="${COMP_DEPTH_VAL:-8}" \
           "$SCRIPT_DIR" || exit 1
 
+    # Fail fast if CMake silently reconfigured to CPU mode.
+    if ! grep -q '^USE_GPU:BOOL=ON$' "CMakeCache.txt"; then
+        local effective_use_gpu
+        effective_use_gpu="$(grep '^USE_GPU:BOOL=' CMakeCache.txt 2>/dev/null || echo 'USE_GPU:BOOL=<missing>')"
+        echo -e "${RED}GPU build requested, but CMake cache ended with ${effective_use_gpu}.${NC}"
+        echo -e "${RED}Aborting before build to avoid a false-positive CPU build.${NC}"
+        echo -e "${YELLOW}Hint: this can happen if CMake resets cache after CUDA compiler changes.${NC}"
+        exit 1
+    fi
+
     echo -e "${YELLOW}Building with CUDA...${NC}"
     cmake --build "$BUILD_DIR" -j"$JOBS" || exit 1
 
     echo -e "${GREEN}✓ GPU build complete!${NC}"
     echo -e "${GREEN}OpenFHE Version: 1.4.2 (FIDESlib-patched, -O3 -march=native)${NC}"
-    echo -e "${GREEN}Supported approaches: 1-11, 51, 81 (51 HyDia-GPU, 81 BSGS-GPU)${NC}"
+    echo -e "${GREEN}Supported approaches: 1-11, 51, 81 (51 HyDia-GPU, 81 BSGS-GPU, 812 BSGS-GPU-PreRot)${NC}"
     echo ""
     echo "Run with: ./run_hydia.sh test/test_1024_k10.dat 9 11 45"
 }

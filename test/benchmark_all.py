@@ -76,10 +76,11 @@ CPU_APPROACHES = [5, 8]  # Approaches available in CPU build (OpenFHE v1.3.0)
 GPU_APPROACHES = [
     51,
     81,
+    812,
 ]  # Approaches available in GPU build (OpenFHE v1.4.2 optimized)
 
 # Output order for results
-OUTPUT_ORDER = [5, 8, 51, 81]
+OUTPUT_ORDER = [5, 8, 51, 81, 812]
 
 # BSGS parameters (for approaches 6, 7, 8, 9)
 BSGS_MULT_DEPTH = 11
@@ -97,6 +98,7 @@ APPROACH_NAMES = {
     9: "BSGS-OnlineAgg (CPU)",
     51: "HyDia-GPU",
     81: "BSGS-GPU",
+    812: "BSGS-GPU-PreRot",
 }
 
 # Dataset configuration (defaults, can be overridden by command line args)
