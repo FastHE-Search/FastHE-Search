@@ -23,10 +23,12 @@
 #include <atomic>
 #include <condition_variable>
 #include <filesystem>
+#include <iomanip>
 #include <iostream>
 #include <mutex>
 #include <queue>
 #include <thread>
+#include <chrono>
 
 using namespace std;
 
@@ -108,6 +110,7 @@ void DiagonalBSGSPreRotEnroller::serializeDB(vector<vector<double>>& database) {
 	size_t preRotated = 0;
 
 	cout << "[Approach 812] Applying plaintext pre-rotations (n1=" << n1 << ")..." << flush;
+	auto preRotStart = chrono::steady_clock::now();
 
 #pragma omp parallel for num_threads(MAX_NUM_CORES) reduction(+ : preRotated)
 	for (size_t i = 0; i < concatenatedRows.size(); ++i) {
@@ -119,8 +122,11 @@ void DiagonalBSGSPreRotEnroller::serializeDB(vector<vector<double>>& database) {
 			preRotated++;
 		}
 	}
+	auto preRotEnd		= chrono::steady_clock::now();
+	lastPreRotationTimeSec_ = chrono::duration<double>(preRotEnd - preRotStart).count();
 
-	cout << " done (" << preRotated << "/" << concatenatedRows.size() << " rows shifted)" << endl;
+	cout << " done (" << preRotated << "/" << concatenatedRows.size() << " rows shifted, " << fixed << setprecision(4) << lastPreRotationTimeSec_ << "s)"
+		 << endl;
 
 	// =====================================================================
 	// Encrypt and serialize (identical to DiagonalEnroller from here on)
