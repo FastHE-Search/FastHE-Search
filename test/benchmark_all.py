@@ -696,19 +696,19 @@ def run_all_benchmarks(build_type, approaches, expected_indices, trial=1):
             idx_status = "✓" if result["index_pass"] else "✗"
 
             print(
-                f"    {status} Wall: {result['wall_time']:.1f}s | "
-                f"Enroll: {result['enroll_time']:.1f}s | "
-                f"Membership: {result['membership_time']:.1f}s | "
-                f"Index: {result['index_time']:.1f}s"
+                f"    {status} Wall: {result['wall_time']:.4f}s | "
+                f"Enroll: {result['enroll_time']:.4f}s | "
+                f"Membership: {result['membership_time']:.4f}s | "
+                f"Index: {result['index_time']:.4f}s"
             )
             gpu_str = (
-                f" | GPU: {result['peak_gpu_gb']:.2f} GB"
+                f" | GPU: {result['peak_gpu_gb']:.4f} GB"
                 if result["peak_gpu_gb"] is not None
                 else ""
             )
             print(
-                f"       RAM: {result['peak_ram_gb']:.2f} GB | "
-                f"Disk: {result['peak_disk_gb']:.2f} GB{gpu_str} | "
+                f"       RAM: {result['peak_ram_gb']:.4f} GB | "
+                f"Disk: {result['peak_disk_gb']:.4f} GB{gpu_str} | "
                 f"Membership: {mem_status} | Index: {idx_status}"
             )
 
@@ -779,14 +779,14 @@ def write_results(results, output_file, append=False):
                     "setup_gpu_db_cache_s": f"{r['setup_gpu_db_cache_s']:.4f}",
                     "setup_offline_total_s": f"{r['setup_offline_total_s']:.4f}",
                     "setup_total_s": f"{r['setup_total_s']:.4f}",
-                    "wall_time_s": f"{r['wall_time']:.2f}",
-                    "enroll_time_s": f"{r['enroll_time']:.2f}",
-                    "membership_time_s": f"{r['membership_time']:.2f}",
-                    "index_time_s": f"{r['index_time']:.2f}",
-                    "peak_ram_gb": f"{r['peak_ram_gb']:.2f}",
-                    "peak_disk_gb": f"{r['peak_disk_gb']:.2f}",
+                    "wall_time_s": f"{r['wall_time']:.4f}",
+                    "enroll_time_s": f"{r['enroll_time']:.4f}",
+                    "membership_time_s": f"{r['membership_time']:.4f}",
+                    "index_time_s": f"{r['index_time']:.4f}",
+                    "peak_ram_gb": f"{r['peak_ram_gb']:.4f}",
+                    "peak_disk_gb": f"{r['peak_disk_gb']:.4f}",
                     "peak_gpu_gb": (
-                        f"{r['peak_gpu_gb']:.2f}"
+                        f"{r['peak_gpu_gb']:.4f}"
                         if r["peak_gpu_gb"] is not None
                         else ""
                     ),
@@ -808,13 +808,13 @@ def print_summary(results):
         success = "✓" if r["success"] else "✗"
         mem = "✓" if r["membership_pass"] else "✗"
         idx = "✓" if r["index_pass"] else "✗"
-        gpu_val = f"{r['peak_gpu_gb']:.2f}" if r["peak_gpu_gb"] is not None else "-"
+        gpu_val = f"{r['peak_gpu_gb']:.4f}" if r["peak_gpu_gb"] is not None else "-"
         print(
             f"{r['build_type']:<26} {r['approach']:<18} "
             f"{success:<8} {mem:<5} {idx:<5} "
-            f"{r['wall_time']:<9.2f} {r['enroll_time']:<10.2f} "
-            f"{r['membership_time']:<10.2f} {r['index_time']:<10.2f} "
-            f"{r['peak_ram_gb']:<8.2f} {r['peak_disk_gb']:<9.2f} {gpu_val:<8}"
+            f"{r['wall_time']:<9.4f} {r['enroll_time']:<10.4f} "
+            f"{r['membership_time']:<10.4f} {r['index_time']:<10.4f} "
+            f"{r['peak_ram_gb']:<8.4f} {r['peak_disk_gb']:<9.4f} {gpu_val:<8}"
         )
 
     print("=" * 140)

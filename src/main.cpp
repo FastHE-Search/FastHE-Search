@@ -675,7 +675,7 @@ int main(int argc, char* argv[]) {
 			auto enrollEnd	 = chrono::steady_clock::now();
 			encDBVectorsTime = chrono::duration<double>(enrollEnd - enrollStart).count();
 			dbEncryptTime	 = std::max(0.0, encDBVectorsTime - diagPreRotTime);
-			cout << "encrypt DB vectors done (" << encDBVectorsTime << "s)" << endl;
+			cout << "encrypt DB vectors done (" << fixed << setprecision(4) << encDBVectorsTime << "s)" << endl;
 		}
 
 		Serial::SerializeToFile("serial/cryptocontext.bin", cc, SerType::BINARY);
@@ -1242,7 +1242,7 @@ int main(int argc, char* argv[]) {
 	end			 = chrono::steady_clock::now();
 	duration	 = end - start;
 	encQueryTime = duration.count();
-	cout << "done (" << encQueryTime << "s)" << endl;
+	cout << "done (" << fixed << setprecision(4) << encQueryTime << "s)" << endl;
 	expStream << encQueryTime << "," << flush;		 // report query encryption time
 	expStream << queryCipher.size() << "," << flush; // report query communication overhead
 
@@ -1256,7 +1256,7 @@ int main(int argc, char* argv[]) {
 		gpuHelper->ComputeAndCacheBabyStepsOnGPU(queryCipher[0], nBaby);
 		auto babyEnd	= chrono::steady_clock::now();
 		double babyTime = chrono::duration<double>(babyEnd - babyStart).count();
-		cout << "done (" << fixed << setprecision(2) << babyTime << "s)" << endl;
+		cout << "done (" << fixed << setprecision(4) << babyTime << "s)" << endl;
 		cout << "[GPUHydiaHelper] " << nBaby << " baby steps cached on GPU memory" << endl;
 	} else if (gpuHelper != nullptr && expApproach == ExperimentalApproach::HyDiaGPU) {
 		cout << "[GPUHydiaHelper] Caching " << VECTOR_DIM << " diagonal rotations on GPU... " << flush;
@@ -1264,7 +1264,7 @@ int main(int argc, char* argv[]) {
 		gpuHelper->ComputeAndCacheBabyStepsOnGPU(queryCipher[0], static_cast<int>(VECTOR_DIM));
 		auto babyEnd	= chrono::steady_clock::now();
 		double babyTime = chrono::duration<double>(babyEnd - babyStart).count();
-		cout << "done (" << fixed << setprecision(2) << babyTime << "s)" << endl;
+		cout << "done (" << fixed << setprecision(4) << babyTime << "s)" << endl;
 		cout << "[GPUHydiaHelper] " << VECTOR_DIM << " rotations cached on GPU memory" << endl;
 	}
 #endif
@@ -1276,7 +1276,7 @@ int main(int argc, char* argv[]) {
 	end									  = chrono::steady_clock::now();
 	duration							  = end - start;
 	membCompTime						  = duration.count();
-	cout << "done (wall: " << membCompTime << "s)" << endl;
+	cout << "done (wall: " << fixed << setprecision(4) << membCompTime << "s)" << endl;
 	expStream << membCompTime << "," << flush; // report membership computation time
 	expStream << 1 << "," << flush;			   // report membership communication overhead
 
@@ -1289,7 +1289,7 @@ int main(int argc, char* argv[]) {
 	end				 = chrono::steady_clock::now();
 	duration		 = end - start;
 	membDecTime		 = duration.count();
-	cout << "done (" << membDecTime << "s)" << endl;
+	cout << "done (" << fixed << setprecision(4) << membDecTime << "s)" << endl;
 	expStream << membDecTime << "," << flush;
 
 	// Perform index scenario (skip for Approach 9 — membership-only approach)
@@ -1305,7 +1305,7 @@ int main(int argc, char* argv[]) {
 		end				 = chrono::steady_clock::now();
 		duration		 = end - start;
 		idxCompTime		 = duration.count();
-		cout << "done (wall: " << idxCompTime << "s)" << endl;
+		cout << "done (wall: " << fixed << setprecision(4) << idxCompTime << "s)" << endl;
 		expStream << idxCompTime << "," << flush;		 // report index computation time
 		expStream << indexCipher.size() << "," << flush; // report index communication overhead
 
@@ -1317,7 +1317,7 @@ int main(int argc, char* argv[]) {
 		end			 = chrono::steady_clock::now();
 		duration	 = end - start;
 		idxDecTime	 = duration.count();
-		cout << "done (" << idxDecTime << "s)" << endl;
+		cout << "done (" << fixed << setprecision(4) << idxDecTime << "s)" << endl;
 		expStream << idxDecTime << "," << flush;
 	}
 

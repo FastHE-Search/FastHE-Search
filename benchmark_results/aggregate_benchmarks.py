@@ -32,6 +32,9 @@ import re
 from pathlib import Path
 
 
+DECIMAL_PLACES = 4
+
+
 def ordered_group(group: pd.DataFrame) -> pd.DataFrame:
     """Return group ordered by trial when available, else preserve row order."""
     if "trial" in group.columns:
@@ -195,10 +198,10 @@ def aggregate_benchmarks(input_file: str, output_file: str = None) -> pd.DataFra
                     median_val = values.median()
 
                     # Format: mean ± std
-                    row[f"{col}_mean"] = f"{mean_val:.2f}"
-                    row[f"{col}_std"] = f"{std_val:.2f}"
-                    row[f"{col}_mean_std"] = f"{mean_val:.2f} ± {std_val:.2f}"
-                    row[f"{col}_median"] = f"{median_val:.2f}"
+                    row[f"{col}_mean"] = f"{mean_val:.{DECIMAL_PLACES}f}"
+                    row[f"{col}_std"] = f"{std_val:.{DECIMAL_PLACES}f}"
+                    row[f"{col}_mean_std"] = f"{mean_val:.{DECIMAL_PLACES}f} ± {std_val:.{DECIMAL_PLACES}f}"
+                    row[f"{col}_median"] = f"{median_val:.{DECIMAL_PLACES}f}"
                 else:
                     row[f"{col}_mean"] = "N/A"
                     row[f"{col}_std"] = "N/A"
@@ -239,21 +242,21 @@ def create_summary_table(input_file: str, output_file: str = None) -> pd.DataFra
         return f"{series.mean():.{decimals}f} ± {series.std(ddof=0):.{decimals}f}"
 
     summary_metric_specs = [
-        ("setup_keygen_s", "setup_keygen", 3),
-        ("setup_rotkeygen_s", "setup_rotkeygen", 3),
-        ("setup_db_encrypt_s", "setup_db_encrypt", 3),
-        ("setup_diag_prerot_s", "setup_diag_prerot", 3),
-        ("setup_gpu_key_upload_s", "setup_gpu_key_upload", 3),
-        ("setup_gpu_db_cache_s", "setup_gpu_db_cache", 3),
-        ("setup_offline_total_s", "setup_offline_total", 3),
-        ("setup_total_s", "setup_total", 3),
-        ("wall_time_s", "wall_time", 1),
-        ("enroll_time_s", "enroll_time", 2),
-        ("membership_time_s", "membership_time", 2),
-        ("index_time_s", "index_time", 2),
-        ("peak_ram_gb", "peak_ram_gb", 1),
-        ("peak_disk_gb", "peak_disk_gb", 1),
-        ("peak_gpu_gb", "peak_gpu_gb", 2),
+        ("setup_keygen_s", "setup_keygen", DECIMAL_PLACES),
+        ("setup_rotkeygen_s", "setup_rotkeygen", DECIMAL_PLACES),
+        ("setup_db_encrypt_s", "setup_db_encrypt", DECIMAL_PLACES),
+        ("setup_diag_prerot_s", "setup_diag_prerot", DECIMAL_PLACES),
+        ("setup_gpu_key_upload_s", "setup_gpu_key_upload", DECIMAL_PLACES),
+        ("setup_gpu_db_cache_s", "setup_gpu_db_cache", DECIMAL_PLACES),
+        ("setup_offline_total_s", "setup_offline_total", DECIMAL_PLACES),
+        ("setup_total_s", "setup_total", DECIMAL_PLACES),
+        ("wall_time_s", "wall_time", DECIMAL_PLACES),
+        ("enroll_time_s", "enroll_time", DECIMAL_PLACES),
+        ("membership_time_s", "membership_time", DECIMAL_PLACES),
+        ("index_time_s", "index_time", DECIMAL_PLACES),
+        ("peak_ram_gb", "peak_ram_gb", DECIMAL_PLACES),
+        ("peak_disk_gb", "peak_disk_gb", DECIMAL_PLACES),
+        ("peak_gpu_gb", "peak_gpu_gb", DECIMAL_PLACES),
     ]
 
     results = []
