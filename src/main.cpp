@@ -26,6 +26,7 @@
 #include "openfhe.h"
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <ctime>
 #include <iomanip>
 #include <iostream>
@@ -117,6 +118,76 @@ inline double getCPUTime() {
 	getrusage(RUSAGE_SELF, &usage);
 	return usage.ru_utime.tv_sec + usage.ru_utime.tv_usec / 1e6 + // user time
 	  usage.ru_stime.tv_sec + usage.ru_stime.tv_usec / 1e6;		  // system time
+}
+
+// Parse whitespace-separated doubles from an in-memory buffer into fixed-length
+// rows, using all available cores. Formatted extraction (`stream >> double`) is
+// single-threaded and locale-aware, which dominates setup for large datasets
+// (2^18 x 512 = 134M values). Chunks are cut on whitespace so no token spans two
+// chunks; a counting pass then fixes each chunk's output offset.
+static void parseDoubleRowsParallel(const char* data, size_t size, double* const* rows, size_t rowLength, size_t totalValues) {
+	auto isSpace = [](char ch) { return std::isspace(static_cast<unsigned char>(ch)) != 0; };
+
+	const int threadCount = std::max<int>(1, static_cast<int>(std::min<size_t>(MAX_NUM_CORES, size / (1 << 20) + 1)));
+	std::vector<size_t> chunkBegin(static_cast<size_t>(threadCount) + 1, size);
+	chunkBegin[0] = 0;
+	for (int t = 1; t < threadCount; ++t) {
+		size_t pos = std::min(size, static_cast<size_t>(t) * (size / static_cast<size_t>(threadCount)));
+		while (pos < size && !isSpace(data[pos]))
+			++pos; // push a straddling token entirely into the previous chunk
+		chunkBegin[static_cast<size_t>(t)] = pos;
+	}
+	chunkBegin[static_cast<size_t>(threadCount)] = size;
+
+	// Pass 1: count tokens per chunk.
+	std::vector<size_t> tokenCount(static_cast<size_t>(threadCount), 0);
+#pragma omp parallel for num_threads(threadCount) schedule(static)
+	for (int t = 0; t < threadCount; ++t) {
+		size_t count = 0;
+		bool inToken  = false;
+		for (size_t i = chunkBegin[static_cast<size_t>(t)]; i < chunkBegin[static_cast<size_t>(t) + 1]; ++i) {
+			if (isSpace(data[i])) {
+				inToken = false;
+			} else if (!inToken) {
+				inToken = true;
+				++count;
+			}
+		}
+		tokenCount[static_cast<size_t>(t)] = count;
+	}
+
+	// Exclusive prefix sum gives each chunk its first output index.
+	std::vector<size_t> chunkOffset(static_cast<size_t>(threadCount) + 1, 0);
+	for (int t = 0; t < threadCount; ++t)
+		chunkOffset[static_cast<size_t>(t) + 1] = chunkOffset[static_cast<size_t>(t)] + tokenCount[static_cast<size_t>(t)];
+
+	// Pass 2: parse each chunk directly into its destination rows.
+#pragma omp parallel for num_threads(threadCount) schedule(static)
+	for (int t = 0; t < threadCount; ++t) {
+		size_t index      = chunkOffset[static_cast<size_t>(t)];
+		const char* cursor = data + chunkBegin[static_cast<size_t>(t)];
+		const char* end    = data + chunkBegin[static_cast<size_t>(t) + 1];
+		size_t row = index / rowLength;
+		size_t col = index % rowLength;
+		while (cursor < end && index < totalValues) {
+			while (cursor < end && isSpace(*cursor))
+				++cursor;
+			if (cursor >= end)
+				break;
+			double value    = 0.0;
+			auto parsed = std::from_chars(cursor, end, value);
+			if (parsed.ec != std::errc())
+				break;
+			cursor       = parsed.ptr;
+			rows[row][col] = value;
+			++index;
+			if (++col == rowLength) {
+				col = 0;
+				++row;
+			}
+		}
+	}
+
 }
 
 // GPU memory detection functions
@@ -619,12 +690,26 @@ int main(int argc, char* argv[]) {
 	diagPreRotTime			  = 0.0;
 	if (!loadDatabaseFromSerial) {
 
-		cout << "Reading database vectors from file... " << endl;
-		for (size_t i = 0; i < numVectors; i++) {
-			for (size_t j = 0; j < VECTOR_DIM; j++) {
-				fileStream >> plaintextVectors[i][j];
-			}
+		cout << "Reading database vectors from file... " << flush;
+		auto readStart = chrono::steady_clock::now();
+		{
+			// Bulk-read the remaining payload once, then parse it with all cores.
+			const streampos payloadStart = fileStream.tellg();
+			fileStream.seekg(0, ios::end);
+			const size_t payloadSize = static_cast<size_t>(fileStream.tellg() - payloadStart);
+			fileStream.seekg(payloadStart);
+
+			vector<char> payload(payloadSize);
+			fileStream.read(payload.data(), static_cast<streamsize>(payloadSize));
+
+
+			vector<double*> rows(numVectors);
+			for (size_t i = 0; i < numVectors; i++)
+				rows[i] = plaintextVectors[i].data();
+
+			parseDoubleRowsParallel(payload.data(), static_cast<size_t>(fileStream.gcount()), rows.data(), VECTOR_DIM, numVectors * VECTOR_DIM);
 		}
+		cout << "done (" << fixed << setprecision(4) << chrono::duration<double>(chrono::steady_clock::now() - readStart).count() << "s)" << endl;
 
 		cout << "Encrypting database vectors... " << flush;
 		auto enrollStart = chrono::steady_clock::now();
