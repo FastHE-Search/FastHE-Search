@@ -319,9 +319,13 @@ def parse_output(output):
         "setup_gpu_db_cache": 0.0,
         "setup_offline_total": 0.0,
         "setup_total": 0.0,
+        "setup_costs_found": False,
+        "fatal_error": False,
         "membership_result": None,  # True/False/None
         "found_indices": [],
     }
+
+    result["fatal_error"] = bool(re.search(r"FATAL:\s", output))
 
     # Enrollment time: "encrypt DB vectors done (32.6528s)"
     enroll_match = re.search(r"encrypt DB vectors done\s*\(([\d.]+)s\)", output)
@@ -351,6 +355,14 @@ def parse_output(output):
         result["setup_gpu_db_cache"] = float(setup_costs.group(6))
         result["setup_offline_total"] = float(setup_costs.group(7))
         result["setup_total"] = float(setup_costs.group(8))
+        result["setup_costs_found"] = True
+
+    # Fallback for runs that abort before printing [SETUP_COSTS] but still
+    # complete expensive DB encryption/setup work.
+    if not result["setup_costs_found"] and result["enroll"] > 0.0:
+        result["setup_db_encrypt"] = result["enroll"]
+        result["setup_offline_total"] = result["enroll"]
+        result["setup_total"] = result["enroll"]
 
     # PRIMARY: Parse from final timing summary string (most reliable)
     # Format: "[TIMESTAMP] DB=2^14 Approach=81 N=512 EncQuery=0.0896s MembComp=0.7915s MembDec=0.0259s IdxComp=0.4729s IdxDec=0.0251s MembResult=SUCCESS"
@@ -570,16 +582,20 @@ def run_benchmark(approach, expected_indices, mult_depth=None, scale_factor=None
     reader.start()
 
     saw_output = False
-    while True:
+    reader_done = False
+    while not reader_done:
         try:
             line = output_queue.get(timeout=0.2)
         except queue.Empty:
-            if process.poll() is not None:
+            # Keep waiting while the reader thread may still have buffered lines
+            # to enqueue. This avoids losing trailing output right after process exit.
+            if process.poll() is not None and not reader.is_alive():
                 break
             continue
 
         if line is None:
-            break
+            reader_done = True
+            continue
 
         saw_output = True
         combined_lines.append(line)
@@ -597,24 +613,28 @@ def run_benchmark(approach, expected_indices, mult_depth=None, scale_factor=None
             f"    | [no subprocess output captured for approach {approach}]", flush=True
         )
 
-    # Check if process terminated successfully
-    success = process.returncode == 0
+    parsed = parse_output(stdout)
+
+    # Treat explicit fatal runtime messages as benchmark failure even if the
+    # process exits with code 0.
+    success = process.returncode == 0 and not parsed["fatal_error"]
 
     if not success:
-        print(f"    ❌ Failed: {stdout[:200]}")
+        fail_reason = "fatal runtime error" if parsed["fatal_error"] else "non-zero exit"
+        print(f"    ❌ Failed ({fail_reason}): {stdout[:200]}")
         return {
             "wall_time": wall_time,
-            "enroll_time": 0.0,
-            "membership_time": 0.0,
-            "index_time": 0.0,
-            "setup_keygen_s": 0.0,
-            "setup_rotkeygen_s": 0.0,
-            "setup_db_encrypt_s": 0.0,
-            "setup_diag_prerot_s": 0.0,
-            "setup_gpu_key_upload_s": 0.0,
-            "setup_gpu_db_cache_s": 0.0,
-            "setup_offline_total_s": 0.0,
-            "setup_total_s": 0.0,
+            "enroll_time": parsed["enroll"],
+            "membership_time": parsed["membership"],
+            "index_time": parsed["index"],
+            "setup_keygen_s": parsed["setup_keygen"],
+            "setup_rotkeygen_s": parsed["setup_rotkeygen"],
+            "setup_db_encrypt_s": parsed["setup_db_encrypt"],
+            "setup_diag_prerot_s": parsed["setup_diag_prerot"],
+            "setup_gpu_key_upload_s": parsed["setup_gpu_key_upload"],
+            "setup_gpu_db_cache_s": parsed["setup_gpu_db_cache"],
+            "setup_offline_total_s": parsed["setup_offline_total"],
+            "setup_total_s": parsed["setup_total"],
             "peak_ram_gb": peak_ram,
             "peak_disk_gb": peak_disk,
             "peak_gpu_gb": peak_gpu,
@@ -622,10 +642,8 @@ def run_benchmark(approach, expected_indices, mult_depth=None, scale_factor=None
             "membership_pass": False,
             "index_pass": False,
             "missed_indices": list(expected_indices),
-            "found_indices": [],
+            "found_indices": parsed["found_indices"],
         }
-
-    parsed = parse_output(stdout)
 
     write_serial_signature(serial_signature)
 
