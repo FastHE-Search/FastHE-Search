@@ -136,6 +136,39 @@ run_campaign "CPU approach 5 (quick test, 2^10..2^13)" cpu \
 
 log ""
 log "=========================================="
+log "Part 2: Literature baseline approaches (GROTE, Blind, HERS) - quick check"
+log "Started at $(date)"
+log "=========================================="
+
+# Test 6: GROTE (approach 2) - small dataset
+# Note: GROTE's index decryption may exceed CKKS approximation limits (an
+# inherent limitation of the alpha-norm group-testing step); the server-side
+# membership/index computation overhead is still measured and recorded.
+run_campaign "GROTE approach 2 (quick test, 2^10..2^12)" current \
+  logn=[10,11,12] \
+  kmatch=[16,16,32] \
+  approaches_gpu=[2] \
+  approaches_cpu=[2] \
+  t=1 fixed_keys=true fresh_dataset=false comp_depth=8
+
+# Test 7: Blind-Match (approach 3) - small dataset
+run_campaign "Blind-Match approach 3 (quick test, 2^10..2^12)" current \
+  logn=[10,11,12] \
+  kmatch=[16,16,32] \
+  approaches_gpu=[3] \
+  approaches_cpu=[3] \
+  t=1 fixed_keys=true fresh_dataset=false comp_depth=8
+
+# Test 8: HERS (approach 4) - small dataset
+run_campaign "HERS approach 4 (quick test, 2^10..2^12)" current \
+  logn=[10,11,12] \
+  kmatch=[16,16,32] \
+  approaches_gpu=[4] \
+  approaches_cpu=[4] \
+  t=1 fixed_keys=true fresh_dataset=false comp_depth=8
+
+log ""
+log "=========================================="
 log "Lite benchmark complete at $(date)"
 log "=========================================="
 log ""
