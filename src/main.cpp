@@ -277,18 +277,18 @@ bool serializedDataExists(ExperimentalApproach approach, size_t numVectors, size
 			return false;
 		}
 	} else if (approach == ExperimentalApproach::LiteratureBaseline || approach == ExperimentalApproach::Grote) {
-		// Base approach: check db folder
-		if (!fileExists("serial/db/database0.bin")) {
+		// Base approach: check db_baseline folder
+		if (!fileExists("serial/db_baseline/batch0.bin")) {
 			return false;
 		}
 	} else if (approach == ExperimentalApproach::BlindMatch) {
 		// Blind approach: check db_blind folder
-		if (!fileExists("serial/db_blind/database0.bin")) {
+		if (!fileExists("serial/db_blind/matrix0/batch0.bin")) {
 			return false;
 		}
 	} else if (approach == ExperimentalApproach::Hers) {
-		// HERS approach: check db folder
-		if (!fileExists("serial/db/database0.bin")) {
+		// HERS approach: check db_hers folder
+		if (!fileExists("serial/db_hers/matrix0/index0.bin")) {
 			return false;
 		}
 	}
