@@ -24,6 +24,7 @@ Example:
     python aggregate_benchmarks.py benchmark_gpu_t10_20260110_142159.csv aggregated_results.csv
 """
 
+import argparse
 import pandas as pd
 import numpy as np
 import sys
@@ -252,7 +253,7 @@ def create_summary_table(input_file: str, output_file: str = None) -> pd.DataFra
     """
     df = pd.read_csv(input_file)
 
-    group_cols = ["approach", "dataset_size", "k_value"]
+    group_cols = ["build_type", "approach", "dataset_size", "k_value"]
 
     def format_mean_std(series: pd.Series, decimals: int = 2) -> str:
         return f"{series.mean():.{decimals}f} ± {series.std(ddof=0):.{decimals}f}"
@@ -278,7 +279,7 @@ def create_summary_table(input_file: str, output_file: str = None) -> pd.DataFra
     results = []
 
     for name, group in df.groupby(group_cols):
-        approach, dataset_size, k_value = name
+        build_type, approach, dataset_size, k_value = name
         ordered = ordered_group(group)
         stats_group = stats_window(group)
 
@@ -286,6 +287,7 @@ def create_summary_table(input_file: str, output_file: str = None) -> pd.DataFra
         num_total = len(group)
 
         row = {
+            "build_type": build_type,
             "approach": approach,
             "dataset_size": dataset_size,
             "k_value": k_value,
@@ -328,7 +330,7 @@ def create_summary_table(input_file: str, output_file: str = None) -> pd.DataFra
         results.append(row)
 
     result_df = pd.DataFrame(results)
-    result_df = result_df.sort_values(["dataset_size", "approach"])
+    result_df = result_df.sort_values(["dataset_size", "approach", "build_type"])
 
     if output_file:
         result_df.to_csv(output_file, index=False)
@@ -337,55 +339,76 @@ def create_summary_table(input_file: str, output_file: str = None) -> pd.DataFra
     return result_df
 
 
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python aggregate_benchmarks.py <input_csv_or_log> [output_csv]")
-        print("\nExample:")
-        print("  python aggregate_benchmarks.py benchmark_gpu_t10_20260110_142159.csv")
-        print("  python aggregate_benchmarks.py benchmark_Feb03.log")
-        print(
-            "  python aggregate_benchmarks.py benchmark_gpu_t10_20260110_142159.csv aggregated.csv"
-        )
+def resolve_input(path: str) -> str:
+    """Resolve a single input path, extracting the CSV from a .log file if needed."""
+    if not os.path.exists(path):
+        print(f"Error: File not found: {path}")
         sys.exit(1)
 
-    input_file = sys.argv[1]
-
-    if not os.path.exists(input_file):
-        print(f"Error: File not found: {input_file}")
-        sys.exit(1)
-
-    # Check if input is a log file
-    if input_file.endswith(".log"):
-        print(f"Detected log file: {input_file}")
-        print("Extracting CSV filename from log...")
+    if path.endswith(".log"):
+        print(f"Detected log file: {path}")
         try:
-            csv_file = extract_csv_from_log(input_file)
+            csv_file = extract_csv_from_log(path)
             print(f"Found CSV file: {csv_file}")
-            actual_input = csv_file
-            # Use the log file's basename for output files
-            base = Path(input_file).stem
+            return csv_file
         except ValueError as e:
             print(f"Error: {e}")
             sys.exit(1)
-    else:
-        actual_input = input_file
-        base = Path(input_file).stem
 
-    # Generate output filename if not provided
-    if len(sys.argv) >= 3:
-        output_file = sys.argv[2]
+    return path
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Aggregate one or more benchmark CSV/log files.",
+        epilog=(
+            "Examples:\n"
+            "  python aggregate_benchmarks.py benchmark_gpu_t10_20260110_142159.csv\n"
+            "  python aggregate_benchmarks.py benchmark_Feb03.log\n"
+            "  python aggregate_benchmarks.py benchmark_gpu_t10_20260110_142159.csv -o aggregated.csv\n"
+            "  python aggregate_benchmarks.py benchmark_cpu_t2_*.csv benchmark_gpu_t2_*.csv -o combined_aggregated.csv"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "inputs", nargs="+", help="One or more benchmark CSV or .log files (shell glob supported)"
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="Output CSV path for the full aggregation (default: <name>_aggregated.csv)",
+    )
+    args = parser.parse_args()
+
+    resolved_inputs = [resolve_input(p) for p in args.inputs]
+
+    if len(resolved_inputs) == 1:
+        actual_input = resolved_inputs[0]
+        base = Path(args.inputs[0]).stem
     else:
-        output_file = f"{base}_aggregated.csv"
+        # Multiple input files (e.g. cpu + gpu csvs, or many trial csvs from a glob):
+        # merge them into a single dataframe/csv instead of silently dropping all
+        # but the first, or treating the 2nd filename as an output path.
+        print(f"Merging {len(resolved_inputs)} input files:")
+        for f in resolved_inputs:
+            print(f"  - {f}")
+        merged_df = pd.concat([pd.read_csv(f) for f in resolved_inputs], ignore_index=True)
+        merge_dir = os.path.dirname(os.path.abspath(resolved_inputs[0])) or "."
+        actual_input = os.path.join(merge_dir, "_merged_benchmarks.csv")
+        merged_df.to_csv(actual_input, index=False)
+        base = "combined"
+
+    output_file = args.output or f"{base}_aggregated.csv"
 
     # Also create summary file
     summary_file = output_file.replace(".csv", "_summary.csv")
 
-    print(f"Input: {input_file}")
     print(f"Output (full): {output_file}")
     print(f"Output (summary): {summary_file}")
     print()
 
-    # Run aggregation
+    # Run aggregation (both full and summary group by build_type, so cpu/gpu
+    # results for the same approach name never get averaged together)
     full_df = aggregate_benchmarks(actual_input, output_file)
     summary_df = create_summary_table(actual_input, summary_file)
 
