@@ -38,10 +38,11 @@ NC='\033[0m' # No Color
 show_help() {
     echo "HyDia Build Script"
     echo ""
-    echo "Usage: $0 [cpu|gpu|clean|clean-all|help]"
+    echo "Usage: $0 [cpu|cpu-fideslib|gpu|clean|clean-all|help]"
     echo ""
     echo "Options:"
     echo "  cpu       Build for CPU only (uses system OpenFHE 1.3.0)"
+    echo "  cpu-fideslib Build for CPU only with FIDESlib's patched OpenFHE 1.4.2"
     echo "  gpu       Build with GPU support (uses FIDESlib's patched OpenFHE 1.4.2)"
     echo "            - Automatically builds FIDESlib with optimized OpenFHE if needed"
     echo "            - OpenFHE built with -O3 -march=native for best performance"
@@ -51,6 +52,7 @@ show_help() {
     echo ""
     echo "Examples:"
     echo "  $0 cpu                                    # CPU build with system OpenFHE"
+    echo "  $0 cpu-fideslib                           # CPU build with FIDESlib OpenFHE"
     echo "  $0 gpu                                    # GPU build (auto-builds FIDESlib)"
     echo "  $0 clean-all && $0 gpu                    # Full clean rebuild for GPU"
     echo "  FIDESLIB_DIR=/path/to/fideslib $0 gpu     # GPU build with external FIDESlib clone"
@@ -288,6 +290,44 @@ build_cpu() {
     echo "Run with: ./run_hydia.sh test/test_1024_k10.dat 6 11 45"
 }
 
+build_cpu_fideslib() {
+    echo -e "${BLUE}========================================${NC}"
+    echo -e "${BLUE}Building HyDia for CPU (OpenFHE 1.4.2)${NC}"
+    echo -e "${BLUE}========================================${NC}"
+
+    require_command cmake
+    resolve_fideslib_dir
+
+    if [ ! -d "$FIDESLIB_DIR/openfhe-install/lib/OpenFHE" ]; then
+        echo -e "${YELLOW}FIDESlib's OpenFHE not found. Building FIDESlib...${NC}"
+        build_fideslib
+    fi
+
+    mkdir -p "$BUILD_DIR"
+    cd "$BUILD_DIR"
+
+    if [ -f "CMakeCache.txt" ]; then
+        echo -e "${YELLOW}Cleaning CMake cache for fresh CPU configuration...${NC}"
+        rm -f CMakeCache.txt
+        rm -rf CMakeFiles/
+    fi
+
+    echo -e "${YELLOW}Using FIDESlib's patched OpenFHE: $FIDESLIB_DIR/openfhe-install${NC}"
+    echo -e "${YELLOW}Running CMake...${NC}"
+    cmake -DUSE_GPU=OFF \
+          -DUSE_FIDESLIB_OPENFHE=ON \
+          -DFIDESLIB_ROOT="$FIDESLIB_DIR" \
+          -DCOMP_DEPTH_VAL="${COMP_DEPTH_VAL:-8}" \
+          "$SCRIPT_DIR" || exit 1
+
+    echo -e "${YELLOW}Building...${NC}"
+    cmake --build "$BUILD_DIR" -j"$JOBS" || exit 1
+
+    echo -e "${GREEN}✓ CPU build complete!${NC}"
+    echo -e "${GREEN}OpenFHE Version: 1.4.2 (FIDESlib-patched, -O3 -march=native)${NC}"
+    echo -e "${GREEN}Supported approaches: 1-8, 11${NC}"
+}
+
 build_gpu() {
     echo -e "${BLUE}========================================${NC}"
     echo -e "${BLUE}Building HyDia for GPU (OpenFHE 1.4.2)${NC}"
@@ -367,6 +407,9 @@ build_gpu() {
 case "${1:-help}" in
     cpu)
         build_cpu
+        ;;
+    cpu-fideslib)
+        build_cpu_fideslib
         ;;
     gpu)
         build_gpu

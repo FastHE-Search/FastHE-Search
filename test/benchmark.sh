@@ -67,6 +67,8 @@ APPROACHES_GPU=""
 APPROACHES_CPU=""
 FIXED_KEYS=false
 GPU_DEVICES_OVERRIDE=""
+COMP_DEPTH_EXPLICIT=false
+ORIGINAL_LITERATURE_COMP_DEPTH=10
 
 # Parse bracket array notation [1,2,3] into bash array
 parse_array() {
@@ -129,6 +131,7 @@ for arg in "$@"; do
             ;;
         comp_depth=*)
             export COMP_DEPTH_VAL="${arg#comp_depth=}"
+            COMP_DEPTH_EXPLICIT=true
             echo -e "${BLUE}Using COMP_DEPTH_VAL=${COMP_DEPTH_VAL}${NC}"
             ;;
         approaches=*)
@@ -154,7 +157,7 @@ for arg in "$@"; do
             echo "Usage: $0 [cpu|gpu|both|current] [logn=N|logn=[N1,N2,...]] [kmatch=K|kmatch=[K1,K2,...]] [t=N] [comp_depth=N] [fresh_dataset=true|false] [fixed_keys=true|false] [approaches=[...]] [approaches_gpu=[...]] [approaches_cpu=[...]] [gpus=0,1,...]"
             echo ""
             echo "Build modes:"
-            echo "  cpu      Build with OpenFHE v1.3.0 and run benchmark"
+            echo "  cpu      Build with FIDESlib's patched OpenFHE v1.4.2 and run benchmark"
             echo "  gpu      Build with FIDESlib's patched OpenFHE v1.4.2 (optimized) and run benchmark"
             echo "  both     Build and benchmark both OpenFHE versions"
             echo "  current  Run benchmark with current build"
@@ -163,7 +166,7 @@ for arg in "$@"; do
             echo "Dataset options (can be single value or array):"
             echo "  logn=N           Single dataset: 2^N vectors"
             echo "  logn=[N1,N2,N3]  Multiple datasets: 2^N1, 2^N2, 2^N3 vectors"
-            echo "  kmatch=K         Single k value for all datasets"
+            echo "  kmatch=K         Single k value for all datasets (GROTE approach 2 requires k=1)"
             echo "  kmatch=[K1,K2,K3] Corresponding k values (must match logn array length)"
             echo ""
             echo "Trial options:"
@@ -173,7 +176,7 @@ for arg in "$@"; do
             echo "  fixed_keys=true      Reuse the same HE key pair across trials while regenerating the encrypted DB"
             echo ""
             echo "Build options:"
-            echo "  comp_depth=N         Comparison depth (default: 8). Passed to cmake as COMP_DEPTH_VAL."
+            echo "  comp_depth=N         Comparison depth (default: 8; approaches 2-4 preserve upstream depth 10)."
             echo ""
             echo "Approach selection (optional - defaults used if not specified):"
             echo "  approaches=[...]           Generic alias applied to active build mode(s)"
@@ -182,6 +185,9 @@ for arg in "$@"; do
             echo "  gpus=0,1,...               Explicit GPU device list for multi-GPU sharding"
             echo ""
             echo "Available approaches:"
+            echo "  2   - GROTE (CPU)"
+            echo "  3   - Blind-Match (CPU)"
+            echo "  4   - HERS (CPU)"
             echo "  5   - HyDia_CPU (baseline)"
             echo "  6   - BSGS-Orig (CPU)"
             echo "  7   - BSGS-Precomp (CPU)"
@@ -197,6 +203,7 @@ for arg in "$@"; do
             echo "  $0 both logn=[10,12,14] kmatch=[16,32,32]        # Multiple datasets"
             echo "  $0 gpu logn=[10,12] kmatch=[16,128] approaches_gpu=[6,51]"
             echo "  $0 current logn=19 kmatch=256 approaches=[81,812] gpus=0,1"
+            echo "  $0 cpu logn=10 kmatch=1 approaches=[2,3,4]        # Rebuild literature approaches at depth 10"
             echo "  $0 gpu logn=10 t=3                               # 3 trials, same dataset (default)"
             echo "  $0 gpu logn=10 t=3 fresh_dataset=true            # 3 trials, new dataset each"
             echo "  BUILD_DIR=/path/to/build TEST_DATA_DIR=/path/to/test $0 gpu logn=18"
@@ -208,6 +215,80 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+approach_list_contains_literature() {
+    local normalized="${1//[/}"
+    normalized="${normalized//]/}"
+    normalized="${normalized// /}"
+
+    case ",${normalized}," in
+        *,2,*|*,3,*|*,4,*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+approach_list_contains() {
+    local normalized="${1//[/}"
+    normalized="${normalized//]/}"
+    normalized="${normalized// /}"
+
+    case ",${normalized}," in
+        *,"$2",*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+ACTIVE_APPROACHES=""
+CURRENT_BUILD_MODE=""
+case "$BUILD_MODE" in
+    cpu)
+        ACTIVE_APPROACHES="$APPROACHES_CPU"
+        ;;
+    gpu)
+        ACTIVE_APPROACHES="$APPROACHES_GPU"
+        ;;
+    both)
+        ACTIVE_APPROACHES="$APPROACHES_CPU,$APPROACHES_GPU"
+        ;;
+    current)
+        if [ -f "$BUILD_DIR/ImageMatching" ] && ldd "$BUILD_DIR/ImageMatching" 2>/dev/null | grep -q "libcuda"; then
+            CURRENT_BUILD_MODE="gpu"
+            ACTIVE_APPROACHES="$APPROACHES_GPU"
+        else
+            CURRENT_BUILD_MODE="cpu"
+            ACTIVE_APPROACHES="$APPROACHES_CPU"
+        fi
+        ;;
+esac
+
+if approach_list_contains "$ACTIVE_APPROACHES" 2; then
+    for kmatch in "${KMATCH_ARRAY[@]}"; do
+        if [ "$kmatch" -ne 1 ]; then
+            echo -e "${RED}Error: GROTE (approach 2) requires kmatch=1; its row/column group-testing index cannot represent multiple simultaneous matches.${NC}"
+            echo -e "${YELLOW}Run approach 2 with kmatch=1, and benchmark approaches 3-4 separately with kmatch=${kmatch}.${NC}"
+            exit 1
+        fi
+    done
+fi
+
+if approach_list_contains_literature "$ACTIVE_APPROACHES"; then
+    if [ "$COMP_DEPTH_EXPLICIT" = "true" ] && [ "$COMP_DEPTH_VAL" -ne "$ORIGINAL_LITERATURE_COMP_DEPTH" ]; then
+        echo -e "${RED}Error: approaches 2-4 retain the upstream comparison depth ${ORIGINAL_LITERATURE_COMP_DEPTH}; requested comp_depth=${COMP_DEPTH_VAL}${NC}"
+        exit 1
+    fi
+
+    export COMP_DEPTH_VAL="$ORIGINAL_LITERATURE_COMP_DEPTH"
+    echo -e "${BLUE}Using original literature comparison depth COMP_DEPTH_VAL=${COMP_DEPTH_VAL}${NC}"
+
+    if [ "$BUILD_MODE" = "current" ]; then
+        CONFIGURED_COMP_DEPTH=$(sed -n 's/^COMP_DEPTH_VAL:STRING=//p' "$BUILD_DIR/CMakeCache.txt" 2>/dev/null)
+        if [ "$CONFIGURED_COMP_DEPTH" != "$ORIGINAL_LITERATURE_COMP_DEPTH" ]; then
+            echo -e "${RED}Error: current build uses COMP_DEPTH_VAL=${CONFIGURED_COMP_DEPTH:-unknown}, but approaches 2-4 require the upstream value ${ORIGINAL_LITERATURE_COMP_DEPTH}.${NC}"
+            echo -e "${YELLOW}Rebuild and benchmark with: $0 ${CURRENT_BUILD_MODE:-cpu} logn=[${LOGN_ARRAY[*]}] kmatch=[${KMATCH_ARRAY[*]}] approaches=${ACTIVE_APPROACHES} comp_depth=${ORIGINAL_LITERATURE_COMP_DEPTH} t=${NUM_TRIALS}${NC}"
+            exit 1
+        fi
+    fi
+fi
 
 # Validate array lengths match
 if [ ${#LOGN_ARRAY[@]} -ne ${#KMATCH_ARRAY[@]} ]; then
@@ -269,7 +350,11 @@ run_benchmark() {
     # Export BUILD_DIR and TEST_DATA_DIR for the Python script
     # GPU_DEVICES is read directly by ImageMatching (see main.cpp) to select/shard GPUs
     cd "$SCRIPT_DIR"
-    CLEAN_SERIAL="$clean_serial" KEEP_SERIAL="$keep_serial" REUSE_KEYS_ONLY="$reuse_keys_only" BENCHMARK_BUILD_FLAVOR="$build_type" BUILD_DIR="$BUILD_DIR" TEST_DATA_DIR="$TEST_DATA_DIR" GPU_DEVICES="$GPU_DEVICES_OVERRIDE" python3 benchmark_all.py "$logn" "$kmatch" --output_file "$output_csv" --trial "$trial" $extra_args
+    local benchmark_flavor="$build_type"
+    if [ "$build_type" = "cpu" ]; then
+        benchmark_flavor="cpu-fideslib"
+    fi
+    CLEAN_SERIAL="$clean_serial" KEEP_SERIAL="$keep_serial" REUSE_KEYS_ONLY="$reuse_keys_only" BENCHMARK_BUILD_FLAVOR="$benchmark_flavor" BUILD_DIR="$BUILD_DIR" TEST_DATA_DIR="$TEST_DATA_DIR" GPU_DEVICES="$GPU_DEVICES_OVERRIDE" python3 benchmark_all.py "$logn" "$kmatch" --output_file "$output_csv" --trial "$trial" $extra_args
 }
 
 set_trial_serial_policy() {
@@ -336,8 +421,8 @@ build_for_mode() {
 
     cd "$PROJECT_ROOT"
     if [ "$build_type" == "cpu" ]; then
-        echo "Building with OpenFHE v1.3.0..."
-        ./build.sh cpu 2>&1 | tail -20
+        echo "Building with OpenFHE v1.4.2 (CPU-only)..."
+        ./build.sh cpu-fideslib 2>&1 | tail -20
     else
         echo "Building with OpenFHE v1.4.2 (optimized)..."
         ./build.sh gpu 2>&1 | tail -20

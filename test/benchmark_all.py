@@ -87,10 +87,17 @@ BSGS_MULT_DEPTH = 11
 BSGS_SCALE_FACTOR = 45
 
 # Build type display names
-BUILD_TYPE_NAMES = {"CPU": "OpenFHE_v1.3.0", "GPU": "OpenFHE_v1.4.2_optimized"}
+BUILD_TYPE_NAMES = {
+    "CPU": "OpenFHE_v1.3.0",
+    "CPU_FIDESLIB": "OpenFHE_v1.4.2_optimized",
+    "GPU": "OpenFHE_v1.4.2_optimized",
+}
 
 # Approach full names
 APPROACH_NAMES = {
+    2: "GROTE (CPU)",
+    3: "Blind-Match (CPU)",
+    4: "HERS (CPU)",
     5: "HyDia_CPU",
     6: "BSGS-Orig (CPU)",
     7: "BSGS-Precomp (CPU)",
@@ -249,6 +256,9 @@ def detect_build_type():
     """Detect if current build is CPU or GPU."""
     if not IMAGE_MATCHING_BIN.exists():
         return None
+
+    if os.environ.get("BENCHMARK_BUILD_FLAVOR") == "cpu-fideslib":
+        return "CPU_FIDESLIB"
 
     # Check if binary has GPU support by running with --help or checking linked libs
     try:
@@ -874,6 +884,13 @@ def main():
     # Validate K
     if DATASET_K < 1 or DATASET_K >= DATASET_SIZE:
         print(f"❌ Error: kmatch must be between 1 and {DATASET_SIZE - 1}")
+        sys.exit(1)
+
+    if custom_approaches and 2 in custom_approaches and DATASET_K != 1:
+        print(
+            "❌ Error: GROTE (approach 2) requires kmatch=1; its row/column "
+            "group-testing index cannot represent multiple simultaneous matches."
+        )
         sys.exit(1)
 
     print("\n" + "=" * 70)

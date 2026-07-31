@@ -16,6 +16,7 @@
 cmake_minimum_required(VERSION 3.25.2)
 
 option(USE_GPU "Set to ON to enable GPU acceleration with FIDESlib" OFF)
+option(USE_FIDESLIB_OPENFHE "Use FIDESlib's patched OpenFHE installation" OFF)
 
 # To use gcc/g++ on a Macintosh, you must set the Compilers here, not inside the
 # project if(APPLE) set(CMAKE_C_COMPILER "/usr/local/bin/gcc-7")
@@ -67,11 +68,11 @@ set(FIDESLIB_ROOT
     "${CMAKE_SOURCE_DIR}/FIDESlib"
     CACHE PATH "Path to the FIDESlib source tree")
 
-if(USE_GPU)
-  # GPU enabled: Use FIDESlib's patched OpenFHE with -O3 -march=native
+if(USE_GPU OR USE_FIDESLIB_OPENFHE)
+  # Use FIDESlib's patched OpenFHE with -O3 -march=native.
   message(
     STATUS
-      "GPU enabled: Using FIDESlib's patched OpenFHE with -O3 optimization"
+      "Using FIDESlib's patched OpenFHE with -O3 optimization"
   )
 
   # FIDESlib's internal OpenFHE installation
