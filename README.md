@@ -173,8 +173,9 @@ The `[APPROACH]` parameter determines which algorithm is used to perform the enc
 | 9         | CPU / GPU  | BSGS-OnlineAgg (CPU) |
 | 51        | GPU build  | HyDia-GPU |
 | 81        | GPU build  | BSGS-GPU |
+| 812       | GPU build  | BSGS-GPU-PreRot |
 
-GPU-specific approaches `51` and `81` require a successful `./build.sh gpu` build.
+GPU-specific approaches `51`, `81`, and `812` require a successful `./build.sh gpu` build.
 
 For instance, try:
 
@@ -204,28 +205,38 @@ The benchmark script can:
 - run both builds back-to-back on the same datasets (`both`), or
 - reuse the current contents of `build/` without rebuilding (`current`).
 
+With no build mode specified, it builds and benchmarks the GPU configuration.
+
 Defaults used by `./test/benchmark.sh`:
 
+- `gpu` build mode using FIDESlib's patched OpenFHE 1.4.2
 - `logn=[10]` → dataset size `2^10 = 1024`
 - `kmatch=[16]`
 - `t=1`
 - `fresh_dataset=false`
+- `fixed_keys=false`
 - `approaches_cpu=[5,8]`
-- `approaches_gpu=[51,81]`
+- `approaches_gpu=[51,81,812]`
 
 Useful examples:
 
 ```bash
+./test/benchmark.sh
 ./test/benchmark.sh gpu
 ./test/benchmark.sh gpu logn=12 kmatch=32 approaches_gpu=[51,81] t=3
 ./test/benchmark.sh cpu logn=[10,12] kmatch=[16,32] approaches_cpu=[5,8,9]
 ./test/benchmark.sh both logn=[10,12,14] kmatch=[16,32,32] t=3
+./test/benchmark.sh current logn=10 kmatch=16 approaches=[5,8]
+./test/benchmark.sh gpu logn=19 kmatch=256 approaches=[81,812] gpus=0,1
 ```
 
 Additional useful options:
 
 - `comp_depth=N` passes `COMP_DEPTH_VAL=N` to the build.
 - `fresh_dataset=true` generates a new dataset for each trial.
+- `fixed_keys=true` reuses the same HE key pair across trials.
+- `approaches=[...]` applies the same approach list to the active build mode.
+- `gpus=0,1,...` selects GPU devices for multi-GPU sharding.
 - `BUILD_DIR=/path/to/build` overrides the build directory.
 - `TEST_DATA_DIR=/path/to/test` overrides where generated datasets are stored.
 
