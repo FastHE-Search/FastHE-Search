@@ -37,6 +37,7 @@
 // NOTE: For comprehensive profiling, use GPU_DEBUG_PROFILER_ENABLED in gpu_debug_profiler.h
 #define GPU_HYDIA_DEBUG 0
 
+#include "CKKS/ApproxModEval.cuh"
 #include "CKKS/Ciphertext.cuh"
 #include "CKKS/Context.cuh"
 #include "CKKS/KeySwitchingKey.cuh"
@@ -1749,131 +1750,21 @@ std::vector<void*> GPUHydiaHelper::BuildChebyshevPowersBinaryTree(void* gpuY_voi
 
 void* GPUHydiaHelper::EvalChebyshevSeriesPSOnGPU(void* gpuCtVoid, const std::vector<double>& coefficients) {
 	GPU_SCOPED_TIMER("EvalChebyshevSeriesPSOnGPU");
-
-	uint32_t n	= static_cast<uint32_t>(coefficients.size()) - 1;
-	auto [k, m] = ComputeDegreesPS(n);
-
-	GPU_DEBUG_PRINT("[Chebyshev PS] degree=" << n << ", k=" << k << ", m=" << m);
-
-	GPU_PROFILE_START("Cheby_BuildPowerTree");
-	std::vector<void*> T_void = BuildChebyshevPowersBinaryTree(gpuCtVoid, k);
-	std::vector<FIDESlib::CKKS::Ciphertext*> T(k);
-	for (uint32_t i = 0; i < k; ++i)
-		T[i] = static_cast<FIDESlib::CKKS::Ciphertext*>(T_void[i]);
-	GPU_PROFILE_END("Cheby_BuildPowerTree");
-
-	GPU_PROFILE_START("Cheby_BuildT2Powers");
-	size_t chebySquares = 0;
-	std::vector<FIDESlib::CKKS::Ciphertext*> T2(m, nullptr);
-	T2[0] = new FIDESlib::CKKS::Ciphertext(gpuContext_);
-	T2[0]->copy(*T[k - 1]);
-	for (uint32_t i = 1; i < m; ++i) {
-		T2[i] = new FIDESlib::CKKS::Ciphertext(gpuContext_);
-		T2[i]->copy(*T2[i - 1]);
-		// Ensure NoiseLevel == 1 before square (FIXEDMANUAL requirement)
-		if (T2[i]->NoiseLevel == 2) {
-			T2[i]->rescale();
-			GPU_COUNT_RESCALE();
-		}
-		T2[i]->square(true);
-		GPU_COUNT_SQUARE();
-		chebySquares++;
-		// Use add instead of multScalar(2.0) to avoid NoiseLevel increase
-		FIDESlib::CKKS::Ciphertext doubled(gpuContext_);
-		doubled.add(*T2[i], *T2[i]); // doubled = T2[i] + T2[i] = 2*T2[i]
-		GPU_COUNT_ADD();
-		T2[i]->copy(doubled);
-		T2[i]->addScalar(-1.0);
+	if (coefficients.empty()) {
+		throw std::invalid_argument("[GPUHydiaHelper] Chebyshev coefficient vector must not be empty.");
 	}
-	GPU_PROFILE_END("Cheby_BuildT2Powers");
-	GPU_DEBUG_PRINT("[Chebyshev PS] T2 squares: " << chebySquares);
 
-	GPU_PROFILE_START("Cheby_ComputeChunks");
-	uint32_t numChunks = (n + k) / k;
-	std::vector<FIDESlib::CKKS::Ciphertext*> Q(numChunks, nullptr);
-	for (uint32_t j = 0; j < numChunks; ++j) {
-		Q[j]			 = new FIDESlib::CKKS::Ciphertext(gpuContext_);
-		uint32_t baseIdx = j * k;
-		bool initialized = false;
-		for (uint32_t i = 1; i < k && baseIdx + i <= n; ++i) {
-			double coef = (baseIdx + i < coefficients.size()) ? coefficients[baseIdx + i] : 0.0;
-			if (std::abs(coef) > 1e-15) {
-				if (!initialized) {
-					Q[j]->copy(*T[i - 1]);
-					Q[j]->multScalar(coef, true);
-					initialized = true;
-				} else {
-					FIDESlib::CKKS::Ciphertext term(gpuContext_);
-					term.copy(*T[i - 1]);
-					term.multScalar(coef, true);
-					Q[j]->add(term);
-					GPU_COUNT_ADD();
-				}
-			}
-		}
-		double c0 = (baseIdx < coefficients.size()) ? coefficients[baseIdx] : 0.0;
-		if (!initialized) {
-			Q[j]->copy(*T[0]);
-			Q[j]->multScalar(0.0, true);
-		}
-		if (std::abs(c0) > 1e-15)
-			Q[j]->addScalar(c0);
-	}
-	GPU_PROFILE_END("Cheby_ComputeChunks");
-	GPU_DEBUG_PRINT("[Chebyshev PS] chunks computed: " << numChunks);
+	auto* input  = static_cast<FIDESlib::CKKS::Ciphertext*>(gpuCtVoid);
+	auto* result = new FIDESlib::CKKS::Ciphertext(gpuContext_);
+	result->copy(*input);
 
-	GPU_PROFILE_START("Cheby_Combine");
-	size_t combineMults				   = 0;
-	FIDESlib::CKKS::Ciphertext* result = new FIDESlib::CKKS::Ciphertext(gpuContext_);
-	result->copy(*Q[numChunks - 1]);
-	for (int j = static_cast<int>(numChunks) - 2; j >= 0; --j) {
-		int resLevel = result->getLevel(), tkLevel = T2[0]->getLevel();
-		if (resLevel > tkLevel)
-			result->dropToLevel(tkLevel);
-		else if (tkLevel > resLevel)
-			T2[0]->dropToLevel(resLevel);
+	// Callers provide the conventional Chebyshev series with c_0 already
+	// halved. FIDESlib performs that halving internally, so restore the DCT
+	// coefficient before delegating to its OpenFHE-derived evaluator.
+	std::vector<double> nativeCoefficients = coefficients;
+	nativeCoefficients[0] *= 2.0;
+	FIDESlib::CKKS::evalChebyshevSeries(*result, nativeCoefficients, -1.0, 1.0);
 
-		if (result->NoiseLevel == 2) {
-			result->rescale();
-			GPU_COUNT_RESCALE();
-		}
-		if (T2[0]->NoiseLevel == 2) {
-			T2[0]->rescale();
-			GPU_COUNT_RESCALE();
-		}
-
-		result->mult(*T2[0], true);
-		GPU_COUNT_MULT();
-		combineMults++;
-
-		if (result->NoiseLevel == 2) {
-			result->rescale();
-			GPU_COUNT_RESCALE();
-		}
-
-		int newResLevel = result->getLevel(), qjLevel = Q[j]->getLevel();
-		if (Q[j]->NoiseLevel == 2) {
-			Q[j]->rescale();
-			GPU_COUNT_RESCALE();
-			qjLevel = Q[j]->getLevel();
-		}
-		if (qjLevel > newResLevel)
-			Q[j]->dropToLevel(newResLevel);
-		result->add(*Q[j]);
-		GPU_COUNT_ADD();
-	}
-	GPU_PROFILE_END("Cheby_Combine");
-	GPU_DEBUG_PRINT("[Chebyshev PS] combine mults: " << combineMults);
-
-	for (auto* t : T)
-		if (t)
-			delete t;
-	for (auto* t2 : T2)
-		if (t2)
-			delete t2;
-	for (auto* q : Q)
-		if (q)
-			delete q;
 	return static_cast<void*>(result);
 }
 
