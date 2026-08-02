@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 
-# FRGC2 false-positive/false-negative benchmark for GPU approaches 81 and 812,
+#  Copyright (c) 2026 LG Electronics, Inc.
+#
+#  Licensed under the MIT License (the "License"); you may not use this file
+#  except in compliance with the License.
+#
+#  You may obtain a copy of the License in the LICENSE file at the project
+#  root or at
+#
+#  https://mit-license.org/
+#
+#  SPDX-License-Identifier: MIT
+
+# FRGC2 false-positive/false-negative benchmark for GPU approaches,
 # with optional approach 8011 regression coverage via --approaches.
 #
 # Full labeled FRGC2 mode requires:
