@@ -289,13 +289,63 @@ int main(int argc, char* argv[]) {
 
 	bool keepSerialAfterRun = keepSerialRequested();
 	bool reuseKeysOnly		= false;
+
+	// Multi-GPU device selection. Default: single GPU 0.
+	// Accepts "--gpus 0,1,2,3" or "--gpus=0,1" on the command line, or the
+	// GPU_DEVICES environment variable (e.g. GPU_DEVICES=0,1). The database is
+	// sharded across the listed GPUs and kept hot on each from the setup phase.
+	auto parseGpuList = [](const std::string& s) {
+		std::vector<int> v;
+		std::string tok;
+		for (char ch : s) {
+			if (ch == ',' || ch == ' ') {
+				if (!tok.empty()) {
+					v.push_back(std::atoi(tok.c_str()));
+					tok.clear();
+				}
+			} else {
+				tok.push_back(ch);
+			}
+		}
+		if (!tok.empty())
+			v.push_back(std::atoi(tok.c_str()));
+		return v;
+	};
+	std::vector<int> gpuDeviceList = { 0 };
+	bool gpusFromCli			   = false;
 	for (int argIndex = 3; argIndex < argc; ++argIndex) {
 		std::string argValue(argv[argIndex]);
 		if (argValue == "--keep-serial") {
 			keepSerialAfterRun = true;
 		} else if (argValue == "--reuse-keys") {
 			reuseKeysOnly = true;
+		} else if (argValue.rfind("--gpus=", 0) == 0) {
+			auto v = parseGpuList(argValue.substr(7));
+			if (!v.empty()) {
+				gpuDeviceList = v;
+				gpusFromCli	  = true;
+			}
+		} else if (argValue == "--gpus" && argIndex + 1 < argc) {
+			auto v = parseGpuList(argv[++argIndex]);
+			if (!v.empty()) {
+				gpuDeviceList = v;
+				gpusFromCli	  = true;
+			}
 		}
+	}
+	if (!gpusFromCli) {
+		const char* gpuEnv = std::getenv("GPU_DEVICES");
+		if (gpuEnv) {
+			auto v = parseGpuList(gpuEnv);
+			if (!v.empty())
+				gpuDeviceList = v;
+		}
+	}
+	if (gpuDeviceList.size() > 1) {
+		cout << "[main] Multi-GPU enabled: devices = [";
+		for (size_t i = 0; i < gpuDeviceList.size(); ++i)
+			cout << gpuDeviceList[i] << (i + 1 < gpuDeviceList.size() ? ", " : "");
+		cout << "]" << endl;
 	}
 
 	// Open global experiment-tracking file
@@ -719,7 +769,7 @@ int main(int argc, char* argv[]) {
 		KeyPair<DCRTPoly> keys;
 		keys.publicKey		   = pk;
 		keys.secretKey		   = sk;
-		vector<int> gpuDevices = { 0 };
+		vector<int> gpuDevices = gpuDeviceList;
 		gpuHelper			   = new GPUHydiaHelper(cc, keys, gpuDevices, batchSize);
 
 		if (!gpuHelper->isReady()) {
@@ -745,9 +795,13 @@ int main(int argc, char* argv[]) {
 			size_t bytesPerCt  = static_cast<size_t>(2 * numLimbs * ringDim * 8 * 2.5);
 			size_t bytesPerKey = bytesPerCt * 3;
 
-			double diagMemGB  = (numDiagonals * bytesPerCt) / (1024.0 * 1024.0 * 1024.0);
-			double keyMemGB	  = (numRotationKeys * bytesPerKey) / (1024.0 * 1024.0 * 1024.0);
-			double totalMemGB = diagMemGB + keyMemGB;
+			double diagMemGB = (numDiagonals * bytesPerCt) / (1024.0 * 1024.0 * 1024.0);
+			double keyMemGB	 = (numRotationKeys * bytesPerKey) / (1024.0 * 1024.0 * 1024.0);
+			// Per-GPU footprint: diagonals are sharded across GPUs, rotation keys
+			// are replicated on every GPU.
+			size_t numGpusShard	   = gpuDeviceList.size();
+			double diagMemPerGpuGB = diagMemGB / static_cast<double>(numGpusShard);
+			double totalMemGB	   = diagMemPerGpuGB + keyMemGB;
 
 			cout << "\n[HyDia-GPU] Memory estimation:" << endl;
 			cout << "  Diagonals:      " << numDiagonals << " x ~15MB = " << fixed << setprecision(2) << diagMemGB << " GB" << endl;
@@ -828,7 +882,7 @@ int main(int argc, char* argv[]) {
 		KeyPair<DCRTPoly> keys;
 		keys.publicKey		   = pk;
 		keys.secretKey		   = sk;
-		vector<int> gpuDevices = { 0 };
+		vector<int> gpuDevices = gpuDeviceList;
 		gpuHelper			   = new GPUHydiaHelper(cc, keys, gpuDevices, batchSize);
 
 		if (!gpuHelper->isReady()) {
@@ -860,15 +914,20 @@ int main(int argc, char* argv[]) {
 			size_t bytesPerCt  = 2 * numLimbs * ringDim * 8 * 2.5;
 			size_t bytesPerKey = bytesPerCt * 3;
 
-			double diagMemGB  = (numDiagonals * bytesPerCt) / (1024.0 * 1024.0 * 1024.0);
-			double keyMemGB	  = (numRotationKeys * bytesPerKey) / (1024.0 * 1024.0 * 1024.0);
-			double totalMemGB = diagMemGB + keyMemGB;
+			double diagMemGB = (numDiagonals * bytesPerCt) / (1024.0 * 1024.0 * 1024.0);
+			double keyMemGB	= (numRotationKeys * bytesPerKey) / (1024.0 * 1024.0 * 1024.0);
+			// Per-GPU footprint: diagonals are sharded across GPUs, rotation keys
+			// are replicated on every GPU.
+			size_t numGpusShard	   = gpuDeviceList.size();
+			double diagMemPerGpuGB = diagMemGB / static_cast<double>(numGpusShard);
+			double totalMemGB	   = diagMemPerGpuGB + keyMemGB;
 
 			cout << "\n[BSGS-Simple-GPU] Memory estimation:" << endl;
-			cout << "  Diagonals:      " << numDiagonals << " x ~15MB = " << fixed << setprecision(2) << diagMemGB << " GB" << endl;
+			cout << "  Diagonals:      " << numDiagonals << " x ~15MB = " << fixed << setprecision(2) << diagMemGB << " GB"
+				 << (numGpusShard > 1 ? ("  (" + to_string(numGpusShard) + " GPUs -> " + to_string(diagMemPerGpuGB) + " GB/GPU)") : "") << endl;
 			cout << "  Rotation keys:  " << numRotationKeys << " x ~45MB = " << fixed << setprecision(2) << keyMemGB << " GB" << " (Baby=" << babyKeyCount
 				 << ", Giant=" << giantKeyCount << ", EvalSum=" << evalSumKeyCount << ")" << endl;
-			cout << "  Total needed:   " << fixed << setprecision(2) << totalMemGB << " GB" << endl;
+			cout << "  Total/GPU:      " << fixed << setprecision(2) << totalMemGB << " GB" << endl;
 			cout << "  GPU safe limit: " << fixed << setprecision(1) << GPU_MEMORY_SAFE_LIMIT_GB << " GB (" << fixed << setprecision(0)
 				 << (GPU_MEMORY_SAFE_LIMIT_GB / GPU_TOTAL_MEMORY_GB * 100) << "% of " << GPU_TOTAL_MEMORY_GB << "GB)" << endl;
 
@@ -961,7 +1020,7 @@ int main(int argc, char* argv[]) {
 		KeyPair<DCRTPoly> keys;
 		keys.publicKey		   = pk;
 		keys.secretKey		   = sk;
-		vector<int> gpuDevices = { 0 };
+		vector<int> gpuDevices = gpuDeviceList;
 		gpuHelper			   = new GPUHydiaHelper(cc, keys, gpuDevices, batchSize);
 
 		if (!gpuHelper->isReady()) {
@@ -994,15 +1053,20 @@ int main(int argc, char* argv[]) {
 			size_t bytesPerCt  = 2 * numLimbs * ringDim * 8 * 2.5;
 			size_t bytesPerKey = bytesPerCt * 3;
 
-			double diagMemGB  = (numDiagonals * bytesPerCt) / (1024.0 * 1024.0 * 1024.0);
-			double keyMemGB	  = (numRotationKeys * bytesPerKey) / (1024.0 * 1024.0 * 1024.0);
-			double totalMemGB = diagMemGB + keyMemGB;
+			double diagMemGB = (numDiagonals * bytesPerCt) / (1024.0 * 1024.0 * 1024.0);
+			double keyMemGB	 = (numRotationKeys * bytesPerKey) / (1024.0 * 1024.0 * 1024.0);
+			// Per-GPU footprint: diagonals are sharded across GPUs, rotation keys
+			// are replicated on every GPU.
+			size_t numGpusShard	   = gpuDeviceList.size();
+			double diagMemPerGpuGB = diagMemGB / static_cast<double>(numGpusShard);
+			double totalMemGB	   = diagMemPerGpuGB + keyMemGB;
 
 			cout << "\n[BSGS-GPU-PreRot] Memory estimation:" << endl;
-			cout << "  Diagonals:      " << numDiagonals << " x ~15MB = " << fixed << setprecision(2) << diagMemGB << " GB" << endl;
+			cout << "  Diagonals:      " << numDiagonals << " x ~15MB = " << fixed << setprecision(2) << diagMemGB << " GB"
+				 << (numGpusShard > 1 ? ("  (" + to_string(numGpusShard) + " GPUs -> " + to_string(diagMemPerGpuGB) + " GB/GPU)") : "") << endl;
 			cout << "  Rotation keys:  " << numRotationKeys << " x ~45MB = " << fixed << setprecision(2) << keyMemGB << " GB" << " (Baby=" << babyKeyCount
 				 << ", Giant=+" << giantKeyCount << ", EvalSum=" << evalSumKeyCount << ", NO negative keys)" << endl;
-			cout << "  Total needed:   " << fixed << setprecision(2) << totalMemGB << " GB" << endl;
+			cout << "  Total/GPU:      " << fixed << setprecision(2) << totalMemGB << " GB" << endl;
 			cout << "  GPU safe limit: " << fixed << setprecision(1) << GPU_MEMORY_SAFE_LIMIT_GB << " GB (" << fixed << setprecision(0)
 				 << (GPU_MEMORY_SAFE_LIMIT_GB / GPU_TOTAL_MEMORY_GB * 100) << "% of " << GPU_TOTAL_MEMORY_GB << "GB)" << endl;
 

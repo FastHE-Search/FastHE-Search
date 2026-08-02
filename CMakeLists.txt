@@ -15,6 +15,8 @@
 
 cmake_minimum_required(VERSION 3.25.2)
 
+option(USE_GPU "Set to ON to enable GPU acceleration with FIDESlib" OFF)
+
 # To use gcc/g++ on a Macintosh, you must set the Compilers here, not inside the
 # project if(APPLE) set(CMAKE_C_COMPILER "/usr/local/bin/gcc-7")
 # set(CMAKE_CXX_COMPILER "/usr/local/bin/g++-7") endif() TODO: for now, we use
@@ -28,10 +30,10 @@ cmake_minimum_required(VERSION 3.25.2)
 # custom application. If you need your application to be linked statically, then
 # run "cmake .. -DBUILD_STATIC=ON"
 
-if(NOT USE_GPU)
-  project(FastHE-Search CXX)
-else()
+if(USE_GPU)
   project(FastHE-Search CXX CUDA)
+else()
+  project(FastHE-Search CXX)
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
@@ -41,7 +43,6 @@ set(CMAKE_C_COMPILER "gcc")
 set(CMAKE_CXX_COMPILER "g++")
 
 option(BUILD_STATIC "Set to ON to include static versions of the library" OFF)
-option(USE_GPU "Set to ON to enable GPU acceleration with FIDESlib" OFF)
 
 # ############# CUDA Configuration ###################
 if(USE_GPU)
@@ -49,8 +50,6 @@ if(USE_GPU)
   if(NOT DEFINED CUDA_PATH)
     set(CUDA_PATH "/usr/local/cuda")
   endif()
-
-  set(CMAKE_CUDA_COMPILER "${CUDA_PATH}/bin/nvcc")
 
   # Check if CUDA is installed.
   if(NOT EXISTS "${CUDA_PATH}")
@@ -274,6 +273,7 @@ if(USE_GPU)
             tbb
             pthread
             dl)
+  target_link_options(ImageMatching PRIVATE $<DEVICE_LINK:-dlto>)
   set_target_properties(ImageMatching PROPERTIES CUDA_SEPARABLE_COMPILATION ON
                                                  CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 endif()
@@ -341,6 +341,7 @@ if(USE_GPU)
             tbb
             pthread
             dl)
+  target_link_options(ImageMatchingAccuracy PRIVATE $<DEVICE_LINK:-dlto>)
   set_target_properties(
     ImageMatchingAccuracy PROPERTIES CUDA_SEPARABLE_COMPILATION ON
                                      CUDA_RESOLVE_DEVICE_SYMBOLS ON)

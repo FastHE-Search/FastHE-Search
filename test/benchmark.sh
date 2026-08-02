@@ -17,9 +17,11 @@
 #
 # Usage:
 #   ./benchmark.sh both logn=[10,12,14] kmatch=[16,32,32]
-#   ./benchmark.sh gpu logn=[10,12] kmatch=[16,128] approaches_gpu=[6,51]
+#   ./benchmark.sh gpu logn=[10,12] kmatch=[16,128] approaches_gpu=[6,51,812]
 #   ./benchmark.sh cpu logn=10 kmatch=32 approaches_cpu=[5,8]
 #   ./benchmark.sh both logn=[10,12,14] kmatch=[16,32,32] approaches_gpu=[6,51] approaches_cpu=[5,8]
+#   ./benchmark.sh current logn=19 kmatch=256 approaches=[812]
+#   ./benchmark.sh current logn=19 kmatch=256 approaches=[81,812] gpus=0,1
 #   ./benchmark.sh gpu logn=[10,12] kmatch=[16,32] t=3   # Run each case 3 times
 #   ./benchmark.sh gpu logn=10 t=3 fresh_dataset=true   # New dataset for each trial
 #   ./benchmark.sh gpu logn=10 t=3 fresh_dataset=false  # Same dataset for all trials (default)
@@ -30,7 +32,7 @@
 #   t=1 (number of trials per configuration)
 #   fresh_dataset=false (reuse same dataset across trials for statistical consistency)
 #   approaches_cpu=[5,8]
-#   approaches_gpu=[51,81]
+#   approaches_gpu=[51,81,812]
 
 set -e
 set -o pipefail
@@ -63,6 +65,7 @@ BUILD_MODE="current"
 APPROACHES_GPU=""
 APPROACHES_CPU=""
 FIXED_KEYS=false
+GPU_DEVICES_OVERRIDE=""
 
 # Parse bracket array notation [1,2,3] into bash array
 parse_array() {
@@ -127,17 +130,27 @@ for arg in "$@"; do
             export COMP_DEPTH_VAL="${arg#comp_depth=}"
             echo -e "${BLUE}Using COMP_DEPTH_VAL=${COMP_DEPTH_VAL}${NC}"
             ;;
+        approaches=*)
+            APPROACHES_GPU="${arg#approaches=}"
+            APPROACHES_CPU="${arg#approaches=}"
+            ;;
         approaches_gpu=*)
             APPROACHES_GPU="${arg#approaches_gpu=}"
             ;;
         approaches_cpu=*)
             APPROACHES_CPU="${arg#approaches_cpu=}"
             ;;
+        gpus=*)
+            GPU_DEVICES_OVERRIDE="${arg#gpus=}"
+            ;;
+        gpu_devices=*)
+            GPU_DEVICES_OVERRIDE="${arg#gpu_devices=}"
+            ;;
         cpu|gpu|both|current)
             BUILD_MODE="$arg"
             ;;
         -h|--help)
-            echo "Usage: $0 [cpu|gpu|both|current] [logn=N|logn=[N1,N2,...]] [kmatch=K|kmatch=[K1,K2,...]] [t=N] [comp_depth=N] [fresh_dataset=true|false] [fixed_keys=true|false] [approaches_gpu=[...]] [approaches_cpu=[...]]"
+            echo "Usage: $0 [cpu|gpu|both|current] [logn=N|logn=[N1,N2,...]] [kmatch=K|kmatch=[K1,K2,...]] [t=N] [comp_depth=N] [fresh_dataset=true|false] [fixed_keys=true|false] [approaches=[...]] [approaches_gpu=[...]] [approaches_cpu=[...]] [gpus=0,1,...]"
             echo ""
             echo "Build modes:"
             echo "  cpu      Build with OpenFHE v1.3.0 and run benchmark"
@@ -161,8 +174,10 @@ for arg in "$@"; do
             echo "  comp_depth=N         Comparison depth (default: 8). Passed to cmake as COMP_DEPTH_VAL."
             echo ""
             echo "Approach selection (optional - defaults used if not specified):"
-            echo "  approaches_gpu=[51,81]     Approaches for GPU build (default)"
+            echo "  approaches=[...]           Generic alias applied to active build mode(s)"
+            echo "  approaches_gpu=[51,81,812] Approaches for GPU build (default)"
             echo "  approaches_cpu=[5,8]       Approaches for CPU build (default)"
+            echo "  gpus=0,1,...               Explicit GPU device list for multi-GPU sharding"
             echo ""
             echo "Available approaches:"
             echo "  5   - HyDia_CPU (baseline)"
@@ -172,12 +187,14 @@ for arg in "$@"; do
             echo "  9   - BSGS-OnlineAgg (CPU)"
             echo "  51  - HyDia-GPU (GPU build only)"
             echo "  81  - BSGS-GPU (GPU build only)"
+            echo "  812 - BSGS-GPU-PreRot (GPU build only)"
             echo ""
             echo "Examples:"
             echo "  $0 both                                          # Use all defaults"
             echo "  $0 gpu logn=12                                   # GPU, 2^12 vectors, k=16 (default)"
             echo "  $0 both logn=[10,12,14] kmatch=[16,32,32]        # Multiple datasets"
             echo "  $0 gpu logn=[10,12] kmatch=[16,128] approaches_gpu=[6,51]"
+            echo "  $0 current logn=19 kmatch=256 approaches=[81,812] gpus=0,1"
             echo "  $0 gpu logn=10 t=3                               # 3 trials, same dataset (default)"
             echo "  $0 gpu logn=10 t=3 fresh_dataset=true            # 3 trials, new dataset each"
             echo "  BUILD_DIR=/path/to/build TEST_DATA_DIR=/path/to/test $0 gpu logn=18"
@@ -216,12 +233,15 @@ done
 if [ -n "$APPROACHES_GPU" ]; then
     echo -e "${BLUE}GPU Approaches: ${APPROACHES_GPU}${NC}"
 else
-    echo -e "${BLUE}GPU Approaches: [51,81] (default)${NC}"
+    echo -e "${BLUE}GPU Approaches: [51,81,812] (default)${NC}"
 fi
 if [ -n "$APPROACHES_CPU" ]; then
     echo -e "${BLUE}CPU Approaches: ${APPROACHES_CPU}${NC}"
 else
     echo -e "${BLUE}CPU Approaches: [5,8] (default)${NC}"
+fi
+if [ -n "$GPU_DEVICES_OVERRIDE" ]; then
+    echo -e "${BLUE}GPU Shard Devices: ${GPU_DEVICES_OVERRIDE}${NC}"
 fi
 echo -e "${BLUE}======================================${NC}"
 
@@ -245,8 +265,9 @@ run_benchmark() {
     # Run benchmark (logn and kmatch are positional args, others are optional)
     # Pass trial number to Python script
     # Export BUILD_DIR and TEST_DATA_DIR for the Python script
+    # GPU_DEVICES is read directly by ImageMatching (see main.cpp) to select/shard GPUs
     cd "$SCRIPT_DIR"
-    CLEAN_SERIAL="$clean_serial" KEEP_SERIAL="$keep_serial" REUSE_KEYS_ONLY="$reuse_keys_only" BUILD_DIR="$BUILD_DIR" TEST_DATA_DIR="$TEST_DATA_DIR" python3 benchmark_all.py "$logn" "$kmatch" --output_file "$output_csv" --trial "$trial" $extra_args
+    CLEAN_SERIAL="$clean_serial" KEEP_SERIAL="$keep_serial" REUSE_KEYS_ONLY="$reuse_keys_only" BENCHMARK_BUILD_FLAVOR="$build_type" BUILD_DIR="$BUILD_DIR" TEST_DATA_DIR="$TEST_DATA_DIR" GPU_DEVICES="$GPU_DEVICES_OVERRIDE" python3 benchmark_all.py "$logn" "$kmatch" --output_file "$output_csv" --trial "$trial" $extra_args
 }
 
 set_trial_serial_policy() {

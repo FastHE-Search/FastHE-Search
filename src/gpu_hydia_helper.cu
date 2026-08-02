@@ -22,11 +22,13 @@
 #include <algorithm> // std::min, std::max for stream pool sizing
 #include <chrono>
 #include <cmath>
+#include <exception>
 #include <functional>
 #include <iomanip>
 #include <iostream>
 #include <omp.h> // OMP parallel deserialization in streaming mode
 #include <stdexcept>
+#include <thread>
 
 // Set to 1 to enable GPU Chebyshev, 0 to fallback to CPU
 #define USE_GPU_CHEBYSHEV 1
@@ -35,7 +37,6 @@
 // NOTE: For comprehensive profiling, use GPU_DEBUG_PROFILER_ENABLED in gpu_debug_profiler.h
 #define GPU_HYDIA_DEBUG 0
 
-#ifdef USE_GPU_ACCELERATION
 #include "CKKS/Ciphertext.cuh"
 #include "CKKS/Context.cuh"
 #include "CKKS/KeySwitchingKey.cuh"
@@ -109,6 +110,35 @@ GPUHydiaHelper::GPUHydiaHelper(CryptoContext<DCRTPoly> cc, const KeyPair<DCRTPol
 	}
 	std::cout << "[GPUHydiaHelper] GPU safe memory limit: " << std::fixed << std::setprecision(2) << gpuSafeMemoryLimitGB_ << " GB" << std::endl;
 
+	// -------------------------------------------------------------------------
+	// MULTI-GPU COORDINATOR MODE
+	// -------------------------------------------------------------------------
+	// When more than one GPU device is supplied, this instance becomes a thin
+	// coordinator that owns one independent single-GPU child helper per device.
+	// The database is sharded across the children; setup fans out and queries
+	// run the children in parallel (one host thread each) and merge on the CPU.
+	if (gpuDevices.size() > 1) {
+		isCoordinator_ = true;
+		shardDevices_  = gpuDevices;
+		std::cout << "[GPUHydiaHelper] Multi-GPU coordinator: " << gpuDevices.size() << " GPUs - database will be split into " << gpuDevices.size()
+				  << " shards (one hot per GPU)" << std::endl;
+
+		bool allReady = true;
+		for (size_t s = 0; s < gpuDevices.size(); ++s) {
+			std::cout << "[GPUHydiaHelper] --- Initializing shard " << s << " on GPU " << gpuDevices[s] << " ---" << std::endl;
+			auto child = std::make_unique<GPUHydiaHelper>(cc_, keys_, std::vector<int>{ gpuDevices[s] }, batchSize_, gpuSafeMemoryLimitGB);
+			if (!child->isReady()) {
+				std::cerr << "[GPUHydiaHelper] Shard " << s << " (GPU " << gpuDevices[s] << ") failed to initialize" << std::endl;
+				allReady = false;
+			}
+			shardHelpers_.push_back(std::move(child));
+		}
+
+		gpuContextReady_ = allReady;
+		cudaSetDevice(gpuDevices[0]); // restore first device as main-thread default
+		return;
+	}
+
 	try {
 		std::cout << "[GPUHydiaHelper] Initializing GPU context with FIDESlib v2..." << std::endl;
 
@@ -170,6 +200,25 @@ bool GPUHydiaHelper::areDiagonalsCached() const {
 
 // APPROACH 81: Cache diagonals with pre-rotation for on-demand BSGS
 void GPUHydiaHelper::CacheDiagonalsWithPreRotationOnGPU(const std::vector<Ciphertext<DCRTPoly>>& diagonals, size_t numMatrices, size_t vectorDim, int n1) {
+
+	if (isCoordinator_) {
+		auto ranges = ComputeShardRanges(numMatrices, shardHelpers_.size());
+		for (size_t s = 0; s < shardHelpers_.size(); ++s) {
+			size_t startM	= ranges[s].first;
+			size_t endM		= ranges[s].second;
+			size_t localNum = endM - startM;
+			std::vector<Ciphertext<DCRTPoly>> slice(diagonals.begin() + startM * vectorDim, diagonals.begin() + endM * vectorDim);
+			cudaSetDevice(shardDevices_[s]);
+			std::cout << "[GPUHydiaHelper] Shard " << s << " (GPU " << shardDevices_[s] << "): caching matrices [" << startM << ", " << endM << ")"
+					  << std::endl;
+			shardHelpers_[s]->CacheDiagonalsWithPreRotationOnGPU(slice, localNum, vectorDim, n1);
+		}
+		cudaSetDevice(shardDevices_[0]);
+		diagonalsCached_	 = true;
+		diagonalsPreRotated_ = true;
+		preRotationN1_		 = n1;
+		return;
+	}
 
 	if (!gpuContextReady_) {
 		std::cerr << "[GPUHydiaHelper] GPU not ready, cannot cache diagonals" << std::endl;
@@ -287,6 +336,25 @@ void GPUHydiaHelper::CacheDiagonalsWithPreRotationOnGPU(const std::vector<Cipher
 
 void GPUHydiaHelper::CachePreRotatedDiagonalsOnGPU(const std::vector<Ciphertext<DCRTPoly>>& diagonals, size_t numMatrices, size_t vectorDim, int n1) {
 
+	if (isCoordinator_) {
+		auto ranges = ComputeShardRanges(numMatrices, shardHelpers_.size());
+		for (size_t s = 0; s < shardHelpers_.size(); ++s) {
+			size_t startM	= ranges[s].first;
+			size_t endM		= ranges[s].second;
+			size_t localNum = endM - startM;
+			std::vector<Ciphertext<DCRTPoly>> slice(diagonals.begin() + startM * vectorDim, diagonals.begin() + endM * vectorDim);
+			cudaSetDevice(shardDevices_[s]);
+			std::cout << "[GPUHydiaHelper] Shard " << s << " (GPU " << shardDevices_[s] << "): caching pre-rotated matrices [" << startM << ", " << endM << ")"
+					  << std::endl;
+			shardHelpers_[s]->CachePreRotatedDiagonalsOnGPU(slice, localNum, vectorDim, n1);
+		}
+		cudaSetDevice(shardDevices_[0]);
+		diagonalsCached_	 = true;
+		diagonalsPreRotated_ = true;
+		preRotationN1_		 = n1;
+		return;
+	}
+
 	if (!gpuContextReady_) {
 		std::cerr << "[GPUHydiaHelper] GPU not ready, cannot cache diagonals" << std::endl;
 		return;
@@ -348,7 +416,25 @@ void GPUHydiaHelper::CachePreRotatedDiagonalsOnGPU(const std::vector<Ciphertext<
 	}
 }
 
-bool GPUHydiaHelper::StreamPreRotatedDiagonalsToGPU(const std::string& serialDir, size_t numDiagonals, size_t numMatrices, int n1) {
+bool GPUHydiaHelper::StreamPreRotatedDiagonalsToGPU(const std::string& serialDir, size_t numDiagonals, size_t numMatrices, int n1, size_t fileIndexOffset) {
+	if (isCoordinator_) {
+		auto ranges = ComputeShardRanges(numMatrices, shardHelpers_.size());
+		bool ok		= true;
+		for (size_t s = 0; s < shardHelpers_.size(); ++s) {
+			size_t startM	= ranges[s].first;
+			size_t localNum = ranges[s].second - startM;
+			cudaSetDevice(shardDevices_[s]);
+			std::cout << "[GPUHydiaHelper] Shard " << s << " (GPU " << shardDevices_[s] << "): streaming pre-rotated matrices [" << startM << ", "
+					  << ranges[s].second << ")" << std::endl;
+			ok &= shardHelpers_[s]->StreamPreRotatedDiagonalsToGPU(serialDir, numDiagonals, localNum, n1, fileIndexOffset + startM * numDiagonals);
+		}
+		cudaSetDevice(shardDevices_[0]);
+		diagonalsCached_	 = true;
+		diagonalsPreRotated_ = true;
+		preRotationN1_		 = n1;
+		return ok;
+	}
+
 	if (!gpuContextReady_) {
 		std::cerr << "[GPUHydiaHelper] GPU not ready, cannot stream diagonals" << std::endl;
 		return false;
@@ -402,7 +488,7 @@ bool GPUHydiaHelper::StreamPreRotatedDiagonalsToGPU(const std::string& serialDir
 #pragma omp parallel for num_threads(ompThreads) schedule(dynamic)
 			for (size_t i = 0; i < currentBatch; ++i) {
 				size_t flatIdx		 = batchStart + i;
-				std::string filepath = serialDir + "/db_diagonal/index" + std::to_string(flatIdx) + ".bin";
+				std::string filepath = serialDir + "/db_diagonal/index" + std::to_string(flatIdx + fileIndexOffset) + ".bin";
 				if (Serial::DeserializeFromFile(filepath, batchCiphers[i], SerType::BINARY)) {
 					loadOk[i] = 1;
 				}
@@ -475,6 +561,43 @@ bool GPUHydiaHelper::StreamPreRotatedDiagonalsToGPU(const std::string& serialDir
 // =============================================================================
 
 void GPUHydiaHelper::ComputeAndCacheBabyStepsOnGPU(const Ciphertext<DCRTPoly>& queryVector, int n1) {
+
+	if (isCoordinator_) {
+		size_t numShards = shardHelpers_.size();
+		std::vector<std::exception_ptr> errs(numShards, nullptr);
+
+		const char* seqEnv = std::getenv("GPU_SHARD_SEQUENTIAL");
+		bool sequential	   = (seqEnv && std::string(seqEnv) == "1");
+
+		auto worker = [&](size_t s) {
+			try {
+				cudaSetDevice(shardDevices_[s]);
+				shardHelpers_[s]->ComputeAndCacheBabyStepsOnGPU(queryVector, n1);
+			} catch (...) {
+				errs[s] = std::current_exception();
+			}
+		};
+
+		if (sequential) {
+			std::cout << "[GPUHydiaHelper] Coordinator baby-step cache: " << numShards << " shards (sequential)" << std::endl;
+			for (size_t s = 0; s < numShards; ++s)
+				worker(s);
+		} else {
+			std::cout << "[GPUHydiaHelper] Coordinator baby-step cache: " << numShards << " shards (parallel, one host thread per GPU)" << std::endl;
+			std::vector<std::thread> threads;
+			threads.reserve(numShards);
+			for (size_t s = 0; s < numShards; ++s)
+				threads.emplace_back(worker, s);
+			for (auto& t : threads)
+				t.join();
+		}
+		for (size_t s = 0; s < numShards; ++s)
+			if (errs[s])
+				std::rethrow_exception(errs[s]);
+
+		cudaSetDevice(shardDevices_[0]);
+		return;
+	}
 
 	if (!gpuContextReady_) {
 		std::cerr << "[GPUHydiaHelper] GPU not ready, cannot compute baby steps" << std::endl;
@@ -597,6 +720,43 @@ void GPUHydiaHelper::ComputeAndCacheBabyStepsOnGPU(const Ciphertext<DCRTPoly>& q
 }
 
 void GPUHydiaHelper::CacheBabyStepsOnGPU(const std::vector<Ciphertext<DCRTPoly>>& babySteps) {
+	if (isCoordinator_) {
+		size_t numShards = shardHelpers_.size();
+		std::vector<std::exception_ptr> errs(numShards, nullptr);
+
+		const char* seqEnv = std::getenv("GPU_SHARD_SEQUENTIAL");
+		bool sequential	   = (seqEnv && std::string(seqEnv) == "1");
+
+		auto worker = [&](size_t s) {
+			try {
+				cudaSetDevice(shardDevices_[s]);
+				shardHelpers_[s]->CacheBabyStepsOnGPU(babySteps);
+			} catch (...) {
+				errs[s] = std::current_exception();
+			}
+		};
+
+		if (sequential) {
+			std::cout << "[GPUHydiaHelper] Coordinator baby-step upload: " << numShards << " shards (sequential)" << std::endl;
+			for (size_t s = 0; s < numShards; ++s)
+				worker(s);
+		} else {
+			std::cout << "[GPUHydiaHelper] Coordinator baby-step upload: " << numShards << " shards (parallel, one host thread per GPU)" << std::endl;
+			std::vector<std::thread> threads;
+			threads.reserve(numShards);
+			for (size_t s = 0; s < numShards; ++s)
+				threads.emplace_back(worker, s);
+			for (auto& t : threads)
+				t.join();
+		}
+		for (size_t s = 0; s < numShards; ++s)
+			if (errs[s])
+				std::rethrow_exception(errs[s]);
+
+		cudaSetDevice(shardDevices_[0]);
+		return;
+	}
+
 	if (!gpuContextReady_) {
 		std::cerr << "[GPUHydiaHelper] GPU not ready, cannot cache baby steps" << std::endl;
 		return;
@@ -640,6 +800,14 @@ void GPUHydiaHelper::CacheBabyStepsOnGPU(const std::vector<Ciphertext<DCRTPoly>>
 }
 
 bool GPUHydiaHelper::areBabyStepsCached() const {
+	if (isCoordinator_) {
+		if (shardHelpers_.empty())
+			return false;
+		for (const auto& h : shardHelpers_)
+			if (!h->areBabyStepsCached())
+				return false;
+		return true;
+	}
 	return babyStepsCached_;
 }
 
@@ -649,6 +817,15 @@ bool GPUHydiaHelper::areBabyStepsCached() const {
 
 // APPROACH 81: Pre-initialize Simple BSGS rotation keys on GPU
 void GPUHydiaHelper::InitializeSimpleBSGSRotationKeysOnGPU(int n1, int vectorDim, size_t numSlots) {
+
+	if (isCoordinator_) {
+		for (size_t s = 0; s < shardHelpers_.size(); ++s) {
+			cudaSetDevice(shardDevices_[s]);
+			shardHelpers_[s]->InitializeSimpleBSGSRotationKeysOnGPU(n1, vectorDim, numSlots);
+		}
+		cudaSetDevice(shardDevices_[0]);
+		return;
+	}
 
 	if (!gpuContextReady_) {
 		std::cerr << "[GPUHydiaHelper] GPU not ready, cannot initialize BSGS rotation keys" << std::endl;
@@ -816,7 +993,25 @@ void GPUHydiaHelper::DestroyMatrixStreams() {
 // StreamDiagonalsToGPU — memory-efficient disk→GPU loader
 // =============================================================================
 
-bool GPUHydiaHelper::StreamDiagonalsToGPU(const std::string& serialDir, size_t numDiagonals, size_t numMatrices, int n1) {
+bool GPUHydiaHelper::StreamDiagonalsToGPU(const std::string& serialDir, size_t numDiagonals, size_t numMatrices, int n1, size_t fileIndexOffset) {
+	if (isCoordinator_) {
+		auto ranges = ComputeShardRanges(numMatrices, shardHelpers_.size());
+		bool ok		= true;
+		for (size_t s = 0; s < shardHelpers_.size(); ++s) {
+			size_t startM	= ranges[s].first;
+			size_t localNum = ranges[s].second - startM;
+			cudaSetDevice(shardDevices_[s]);
+			std::cout << "[GPUHydiaHelper] Shard " << s << " (GPU " << shardDevices_[s] << "): streaming matrices [" << startM << ", " << ranges[s].second << ")"
+					  << std::endl;
+			ok &= shardHelpers_[s]->StreamDiagonalsToGPU(serialDir, numDiagonals, localNum, n1, fileIndexOffset + startM * numDiagonals);
+		}
+		cudaSetDevice(shardDevices_[0]);
+		diagonalsCached_	 = true;
+		diagonalsPreRotated_ = true;
+		preRotationN1_		 = n1;
+		return ok;
+	}
+
 	if (!gpuContextReady_) {
 		std::cerr << "[GPUHydiaHelper] GPU not ready, cannot stream diagonals" << std::endl;
 		return false;
@@ -891,7 +1086,7 @@ bool GPUHydiaHelper::StreamDiagonalsToGPU(const std::string& serialDir, size_t n
 #pragma omp parallel for num_threads(ompThreads) schedule(dynamic)
 			for (size_t i = 0; i < currentBatch; ++i) {
 				size_t flatIdx		 = batchStart + i;
-				std::string filepath = serialDir + "/db_diagonal/index" + std::to_string(flatIdx) + ".bin";
+				std::string filepath = serialDir + "/db_diagonal/index" + std::to_string(flatIdx + fileIndexOffset) + ".bin";
 				if (Serial::DeserializeFromFile(filepath, batchCiphers[i], SerType::BINARY)) {
 					loadOk[i] = 1;
 				}
@@ -1107,6 +1302,59 @@ void* GPUHydiaHelper::ProcessSimilarityMatrixOnStream(size_t matrixIdx, size_t v
 Ciphertext<DCRTPoly>
 GPUHydiaHelper::EvalOnDemandBSGSLazyChebyshevAndAggregateOnGPU(size_t numMatrices, size_t vectorDim, int n1, const Ciphertext<DCRTPoly>& templateCt, double delta, size_t signDepth, size_t numSlots) {
 
+	if (isCoordinator_) {
+		size_t numShards = shardHelpers_.size();
+		auto ranges		 = ComputeShardRanges(numMatrices, numShards);
+		std::vector<Ciphertext<DCRTPoly>> partial(numShards);
+		std::vector<std::exception_ptr> errs(numShards, nullptr);
+
+		const char* seqEnv = std::getenv("GPU_SHARD_SEQUENTIAL");
+		bool sequential	   = (seqEnv && std::string(seqEnv) == "1");
+
+		auto worker = [&](size_t s) {
+			try {
+				if (ranges[s].second == ranges[s].first)
+					return;
+				cudaSetDevice(shardDevices_[s]);
+				partial[s] = shardHelpers_[s]->EvalOnDemandBSGSLazyChebyshevAndAggregateOnGPU(
+				  ranges[s].second - ranges[s].first, vectorDim, n1, templateCt, delta, signDepth, numSlots);
+			} catch (...) {
+				errs[s] = std::current_exception();
+			}
+		};
+
+		if (sequential) {
+			std::cout << "[GPUHydiaHelper] Coordinator membership: " << numShards << " shards (sequential)" << std::endl;
+			for (size_t s = 0; s < numShards; ++s)
+				worker(s);
+		} else {
+			std::cout << "[GPUHydiaHelper] Coordinator membership: " << numShards << " shards (parallel, one host thread per GPU)" << std::endl;
+			std::vector<std::thread> threads;
+			for (size_t s = 0; s < numShards; ++s)
+				threads.emplace_back(worker, s);
+			for (auto& t : threads)
+				t.join();
+		}
+		for (size_t s = 0; s < numShards; ++s)
+			if (errs[s])
+				std::rethrow_exception(errs[s]);
+
+		cudaSetDevice(shardDevices_[0]);
+		Ciphertext<DCRTPoly> merged;
+		bool first = true;
+		for (size_t s = 0; s < numShards; ++s) {
+			if (ranges[s].second == ranges[s].first)
+				continue;
+			if (first) {
+				merged = partial[s];
+				first  = false;
+			} else {
+				merged = cc_->EvalAdd(merged, partial[s]);
+			}
+		}
+		return merged;
+	}
+
 	if (!gpuContextReady_ || !diagonalsCached_ || !babyStepsCached_) {
 		throw std::runtime_error("[GPUHydiaHelper] GPU/diagonals/baby steps not ready");
 	}
@@ -1269,6 +1517,51 @@ GPUHydiaHelper::EvalOnDemandBSGSLazyChebyshevAndAggregateOnGPU(size_t numMatrice
 
 std::vector<Ciphertext<DCRTPoly>>
 GPUHydiaHelper::EvalOnDemandBSGSLazyChebyshevBatchedOnGPU(size_t numMatrices, size_t vectorDim, int n1, const Ciphertext<DCRTPoly>& templateCt, double delta, size_t signDepth) {
+
+	if (isCoordinator_) {
+		size_t numShards = shardHelpers_.size();
+		auto ranges		 = ComputeShardRanges(numMatrices, numShards);
+		std::vector<std::vector<Ciphertext<DCRTPoly>>> partial(numShards);
+		std::vector<std::exception_ptr> errs(numShards, nullptr);
+
+		const char* seqEnv = std::getenv("GPU_SHARD_SEQUENTIAL");
+		bool sequential	   = (seqEnv && std::string(seqEnv) == "1");
+
+		auto worker = [&](size_t s) {
+			try {
+				if (ranges[s].second == ranges[s].first)
+					return;
+				cudaSetDevice(shardDevices_[s]);
+				partial[s] = shardHelpers_[s]->EvalOnDemandBSGSLazyChebyshevBatchedOnGPU(
+				  ranges[s].second - ranges[s].first, vectorDim, n1, templateCt, delta, signDepth);
+			} catch (...) {
+				errs[s] = std::current_exception();
+			}
+		};
+
+		if (sequential) {
+			std::cout << "[GPUHydiaHelper] Coordinator index: " << numShards << " shards (sequential)" << std::endl;
+			for (size_t s = 0; s < numShards; ++s)
+				worker(s);
+		} else {
+			std::cout << "[GPUHydiaHelper] Coordinator index: " << numShards << " shards (parallel, one host thread per GPU)" << std::endl;
+			std::vector<std::thread> threads;
+			for (size_t s = 0; s < numShards; ++s)
+				threads.emplace_back(worker, s);
+			for (auto& t : threads)
+				t.join();
+		}
+		for (size_t s = 0; s < numShards; ++s)
+			if (errs[s])
+				std::rethrow_exception(errs[s]);
+
+		std::vector<Ciphertext<DCRTPoly>> all;
+		all.reserve(numMatrices);
+		for (size_t s = 0; s < numShards; ++s)
+			for (auto& c : partial[s])
+				all.push_back(c);
+		return all;
+	}
 
 	if (!gpuContextReady_ || !diagonalsCached_ || !babyStepsCached_) {
 		throw std::runtime_error("[GPUHydiaHelper] GPU/diagonals/baby steps not ready");
@@ -1623,6 +1916,59 @@ void* GPUHydiaHelper::EvalChebyshevCompareOnGPU(void* gpuCtVoid, double delta, s
 Ciphertext<DCRTPoly>
 GPUHydiaHelper::EvalSimilarityChebyshevAndAggregateOnGPU(size_t numMatrices, size_t vectorDim, const Ciphertext<DCRTPoly>& templateCt, double delta, size_t signDepth, size_t numSlots) {
 
+	if (isCoordinator_) {
+		size_t numShards = shardHelpers_.size();
+		auto ranges		 = ComputeShardRanges(numMatrices, numShards);
+		std::vector<Ciphertext<DCRTPoly>> partial(numShards);
+		std::vector<std::exception_ptr> errs(numShards, nullptr);
+
+		const char* seqEnv = std::getenv("GPU_SHARD_SEQUENTIAL");
+		bool sequential	   = (seqEnv && std::string(seqEnv) == "1");
+
+		auto worker = [&](size_t s) {
+			try {
+				if (ranges[s].second == ranges[s].first)
+					return;
+				cudaSetDevice(shardDevices_[s]);
+				partial[s] = shardHelpers_[s]->EvalSimilarityChebyshevAndAggregateOnGPU(
+				  ranges[s].second - ranges[s].first, vectorDim, templateCt, delta, signDepth, numSlots);
+			} catch (...) {
+				errs[s] = std::current_exception();
+			}
+		};
+
+		if (sequential) {
+			std::cout << "[GPUHydiaHelper] Coordinator A51 membership: " << numShards << " shards (sequential)" << std::endl;
+			for (size_t s = 0; s < numShards; ++s)
+				worker(s);
+		} else {
+			std::cout << "[GPUHydiaHelper] Coordinator A51 membership: " << numShards << " shards (parallel, one host thread per GPU)" << std::endl;
+			std::vector<std::thread> threads;
+			for (size_t s = 0; s < numShards; ++s)
+				threads.emplace_back(worker, s);
+			for (auto& t : threads)
+				t.join();
+		}
+		for (size_t s = 0; s < numShards; ++s)
+			if (errs[s])
+				std::rethrow_exception(errs[s]);
+
+		cudaSetDevice(shardDevices_[0]);
+		Ciphertext<DCRTPoly> merged;
+		bool first = true;
+		for (size_t s = 0; s < numShards; ++s) {
+			if (ranges[s].second == ranges[s].first)
+				continue;
+			if (first) {
+				merged = partial[s];
+				first  = false;
+			} else {
+				merged = cc_->EvalAdd(merged, partial[s]);
+			}
+		}
+		return merged;
+	}
+
 	if (!gpuContextReady_ || !diagonalsCached_ || !babyStepsCached_) {
 		throw std::runtime_error("[GPUHydiaHelper] GPU/diagonals/baby steps not ready");
 	}
@@ -1815,6 +2161,51 @@ GPUHydiaHelper::EvalSimilarityChebyshevAndAggregateOnGPU(size_t numMatrices, siz
 std::vector<Ciphertext<DCRTPoly>>
 GPUHydiaHelper::EvalSimilarityAndChebyshevBatchedOnGPU(size_t numMatrices, size_t vectorDim, const Ciphertext<DCRTPoly>& templateCt, double delta, size_t signDepth) {
 
+	if (isCoordinator_) {
+		size_t numShards = shardHelpers_.size();
+		auto ranges		 = ComputeShardRanges(numMatrices, numShards);
+		std::vector<std::vector<Ciphertext<DCRTPoly>>> partial(numShards);
+		std::vector<std::exception_ptr> errs(numShards, nullptr);
+
+		const char* seqEnv = std::getenv("GPU_SHARD_SEQUENTIAL");
+		bool sequential	   = (seqEnv && std::string(seqEnv) == "1");
+
+		auto worker = [&](size_t s) {
+			try {
+				if (ranges[s].second == ranges[s].first)
+					return;
+				cudaSetDevice(shardDevices_[s]);
+				partial[s] = shardHelpers_[s]->EvalSimilarityAndChebyshevBatchedOnGPU(
+				  ranges[s].second - ranges[s].first, vectorDim, templateCt, delta, signDepth);
+			} catch (...) {
+				errs[s] = std::current_exception();
+			}
+		};
+
+		if (sequential) {
+			std::cout << "[GPUHydiaHelper] Coordinator A51 index: " << numShards << " shards (sequential)" << std::endl;
+			for (size_t s = 0; s < numShards; ++s)
+				worker(s);
+		} else {
+			std::cout << "[GPUHydiaHelper] Coordinator A51 index: " << numShards << " shards (parallel, one host thread per GPU)" << std::endl;
+			std::vector<std::thread> threads;
+			for (size_t s = 0; s < numShards; ++s)
+				threads.emplace_back(worker, s);
+			for (auto& t : threads)
+				t.join();
+		}
+		for (size_t s = 0; s < numShards; ++s)
+			if (errs[s])
+				std::rethrow_exception(errs[s]);
+
+		std::vector<Ciphertext<DCRTPoly>> all;
+		all.reserve(numMatrices);
+		for (size_t s = 0; s < numShards; ++s)
+			for (auto& c : partial[s])
+				all.push_back(c);
+		return all;
+	}
+
 	if (!gpuContextReady_ || !diagonalsCached_ || !babyStepsCached_) {
 		throw std::runtime_error("[GPUHydiaHelper] GPU/diagonals/baby steps not ready");
 	}
@@ -1925,98 +2316,17 @@ GPUHydiaHelper::EvalSimilarityAndChebyshevBatchedOnGPU(size_t numMatrices, size_
 	}
 }
 
-#else
-// =============================================================================
-// Stub implementation when GPU is disabled
-// =============================================================================
-
-GPUHydiaHelper::GPUHydiaHelper(CryptoContext<DCRTPoly> cc, const KeyPair<DCRTPoly>& keys, const std::vector<int>& gpuDevices, int batchSize, double gpuSafeMemoryLimitGB)
-: cc_(cc), keys_(keys), gpuContextReady_(false), batchSize_(batchSize) {
-
-	std::cerr << "[GPUHydiaHelper] WARNING: GPU support not compiled in this build." << std::endl;
-	std::cerr << "[GPUHydiaHelper] Rebuild with -DUSE_GPU=ON to enable GPU acceleration." << std::endl;
-	gpuContextReady_ = false;
-}
-
-GPUHydiaHelper::~GPUHydiaHelper() {
-	// Nothing to cleanup in stub
-}
-
-bool GPUHydiaHelper::areDiagonalsCached() const {
-	return false;
-}
-
-void GPUHydiaHelper::ComputeAndCacheBabyStepsOnGPU(const Ciphertext<DCRTPoly>& queryVector, int n1) {
-	std::cerr << "[GPUHydiaHelper] GPU baby step computation not available in CPU-only build" << std::endl;
-	throw std::runtime_error("GPU not available");
-}
-
-bool GPUHydiaHelper::areBabyStepsCached() const {
-	return false;
-}
-
-void GPUHydiaHelper::CacheBabyStepsOnGPU(const std::vector<Ciphertext<DCRTPoly>>& babySteps) {
-	std::cerr << "[GPUHydiaHelper] Baby step caching not available in CPU-only build" << std::endl;
-}
-
-void GPUHydiaHelper::CacheDiagonalsWithPreRotationOnGPU(const std::vector<Ciphertext<DCRTPoly>>& diagonals, size_t numMatrices, size_t vectorDim, int n1) {
-	std::cerr << "[GPUHydiaHelper] Diagonal caching not available in CPU-only build" << std::endl;
-}
-
-bool GPUHydiaHelper::StreamDiagonalsToGPU(const std::string& serialDir, size_t numDiagonals, size_t numMatrices, int n1) {
-	std::cerr << "[GPUHydiaHelper] StreamDiagonalsToGPU not available in CPU-only build" << std::endl;
-	return false;
-}
-
-void GPUHydiaHelper::InitializeSimpleBSGSRotationKeysOnGPU(int n1, int vectorDim, size_t numSlots) {
-	std::cerr << "[GPUHydiaHelper] Rotation key init not available in CPU-only build" << std::endl;
-	throw std::runtime_error("GPU not available");
-}
-
-Ciphertext<DCRTPoly>
-GPUHydiaHelper::EvalOnDemandBSGSLazyChebyshevAndAggregateOnGPU(size_t numMatrices, size_t vectorDim, int n1, const Ciphertext<DCRTPoly>& templateCt, double delta, size_t signDepth, size_t numSlots) {
-	throw std::runtime_error("[GPUHydiaHelper] GPU not available in CPU-only build");
-}
-
-std::vector<Ciphertext<DCRTPoly>>
-GPUHydiaHelper::EvalOnDemandBSGSLazyChebyshevBatchedOnGPU(size_t numMatrices, size_t vectorDim, int n1, const Ciphertext<DCRTPoly>& templateCt, double delta, size_t signDepth) {
-	throw std::runtime_error("[GPUHydiaHelper] GPU not available in CPU-only build");
-}
-
-Ciphertext<DCRTPoly>
-GPUHydiaHelper::EvalSimilarityChebyshevAndAggregateOnGPU(size_t numMatrices, size_t vectorDim, const Ciphertext<DCRTPoly>& templateCt, double delta, size_t signDepth, size_t numSlots) {
-	throw std::runtime_error("[GPUHydiaHelper] GPU not available in CPU-only build");
-}
-
-std::vector<Ciphertext<DCRTPoly>>
-GPUHydiaHelper::EvalSimilarityAndChebyshevBatchedOnGPU(size_t numMatrices, size_t vectorDim, const Ciphertext<DCRTPoly>& templateCt, double delta, size_t signDepth) {
-	throw std::runtime_error("[GPUHydiaHelper] GPU not available in CPU-only build");
-}
-
-void* GPUHydiaHelper::EvalChebyshevCompareOnGPU(void* gpuCtVoid, double delta, size_t signDepth) {
-	std::cerr << "[GPUHydiaHelper] EvalChebyshevCompareOnGPU not available in CPU-only build" << std::endl;
-	return nullptr;
-}
-
-void* GPUHydiaHelper::EvalChebyshevSeriesPSOnGPU(void* gpuCt, const std::vector<double>& coefficients) {
-	std::cerr << "[GPUHydiaHelper] EvalChebyshevSeriesPSOnGPU not available in CPU-only build" << std::endl;
-	return nullptr;
-}
-
-std::pair<uint32_t, uint32_t> GPUHydiaHelper::ComputeDegreesPS(uint32_t n) {
-	if (n <= 1)
-		return { 1, 1 };
-	uint32_t bestK = n, bestM = 1, bestCost = n + 1;
-	for (uint32_t m = 1; m <= 10; ++m) {
-		uint32_t power = 1 << (m - 1);
-		uint32_t k	   = (n + power - 1) / power;
-		if (k >= 1 && k + m < bestCost) {
-			bestK	 = k;
-			bestM	 = m;
-			bestCost = k + m;
-		}
+std::vector<std::pair<size_t, size_t>> GPUHydiaHelper::ComputeShardRanges(size_t numMatrices, size_t numShards) const {
+	std::vector<std::pair<size_t, size_t>> ranges;
+	if (numShards == 0)
+		numShards = 1;
+	size_t base	  = numMatrices / numShards;
+	size_t rem	  = numMatrices % numShards;
+	size_t start = 0;
+	for (size_t shard = 0; shard < numShards; ++shard) {
+		size_t count = base + (shard < rem ? 1 : 0);
+		ranges.emplace_back(start, start + count);
+		start += count;
 	}
-	return { bestK, bestM };
+	return ranges;
 }
-
-#endif // USE_GPU_ACCELERATION
