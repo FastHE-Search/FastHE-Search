@@ -27,6 +27,7 @@
 #   ./benchmark.sh gpu logn=10 t=3 fresh_dataset=false  # Same dataset for all trials (default)
 #
 # Defaults:
+#   build mode=gpu (FIDESlib-patched OpenFHE 1.4.2)
 #   logn=[10] (2^10 = 1024 vectors)
 #   kmatch=[16]
 #   t=1 (number of trials per configuration)
@@ -61,7 +62,7 @@ LOGN_ARRAY=(10)
 KMATCH_ARRAY=(16)
 NUM_TRIALS=1
 FRESH_DATASET=false
-BUILD_MODE="current"
+BUILD_MODE="gpu"
 APPROACHES_GPU=""
 APPROACHES_CPU=""
 FIXED_KEYS=false
@@ -156,7 +157,8 @@ for arg in "$@"; do
             echo "  cpu      Build with OpenFHE v1.3.0 and run benchmark"
             echo "  gpu      Build with FIDESlib's patched OpenFHE v1.4.2 (optimized) and run benchmark"
             echo "  both     Build and benchmark both OpenFHE versions"
-            echo "  current  Run benchmark with current build (default)"
+            echo "  current  Run benchmark with current build"
+            echo "  gpu      Build and benchmark GPU mode (default)"
             echo ""
             echo "Dataset options (can be single value or array):"
             echo "  logn=N           Single dataset: 2^N vectors"

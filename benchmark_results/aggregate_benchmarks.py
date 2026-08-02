@@ -32,6 +32,33 @@ import re
 from pathlib import Path
 
 
+DECIMAL_PLACES = 4
+
+EXACT_FIRST_TRIAL_COLS = {
+    "setup_keygen_s",
+    "setup_rotkeygen_s",
+    "setup_db_encrypt_s",
+    "setup_diag_prerot_s",
+    "setup_offline_total_s",
+    "peak_disk_gb",
+}
+
+
+def ordered_group(group: pd.DataFrame) -> pd.DataFrame:
+    """Return group ordered by trial when available, else preserve row order."""
+    if "trial" in group.columns:
+        return group.sort_values("trial", kind="stable")
+    return group.sort_index(kind="stable")
+
+
+def stats_window(group: pd.DataFrame) -> pd.DataFrame:
+    """Use trials 2..n for stats when n>1; otherwise use trial 1."""
+    ordered = ordered_group(group)
+    if len(ordered) > 1:
+        return ordered.iloc[1:]
+    return ordered
+
+
 def extract_csv_from_log(log_file: str) -> str:
     """
     Extract the CSV filename from a log file.
@@ -94,6 +121,14 @@ def aggregate_benchmarks(input_file: str, output_file: str = None) -> pd.DataFra
 
     # Define all possible numeric columns, filter to only those present in the CSV
     all_numeric_cols = [
+        "setup_keygen_s",
+        "setup_rotkeygen_s",
+        "setup_db_encrypt_s",
+        "setup_diag_prerot_s",
+        "setup_gpu_key_upload_s",
+        "setup_gpu_db_cache_s",
+        "setup_offline_total_s",
+        "setup_total_s",
         "wall_time_s",
         "enroll_time_s",
         "membership_time_s",
@@ -109,6 +144,8 @@ def aggregate_benchmarks(input_file: str, output_file: str = None) -> pd.DataFra
     # Group by approach, dataset_size, k_value
     for name, group in df.groupby(group_cols):
         build_type, approach, dataset_size, k_value = name
+        ordered = ordered_group(group)
+        stats_group = stats_window(group)
 
         row = {
             "build_type": build_type,
@@ -121,6 +158,7 @@ def aggregate_benchmarks(input_file: str, output_file: str = None) -> pd.DataFra
         # Count passing and failing trials
         passing_trials = group[group["success"] == "PASS"]
         num_pass = len(passing_trials)
+        stats_passing_trials = stats_group[stats_group["success"] == "PASS"]
 
         row["num_pass"] = num_pass
         row["success"] = (
@@ -139,10 +177,35 @@ def aggregate_benchmarks(input_file: str, output_file: str = None) -> pd.DataFra
             else "FAIL" if num_pass > 0 else "N/A"
         )
 
-        # For each numeric column - use only passing trials for stats
+        # Some setup metrics are emitted only on trial 1; preserve that exact
+        # value instead of aggregating trials 2..n.
+        for exact_col in sorted(EXACT_FIRST_TRIAL_COLS.intersection(numeric_cols)):
+            exact_trial1 = ordered[exact_col].dropna()
+            if len(exact_trial1) > 0:
+                v = float(exact_trial1.iloc[0])
+                if exact_col == "peak_disk_gb":
+                    row[f"{exact_col}_mean"] = f"{v:.2f}"
+                    row[f"{exact_col}_std"] = "0.00"
+                    row[f"{exact_col}_mean_std"] = f"{v:.2f}"
+                    row[f"{exact_col}_median"] = f"{v:.2f}"
+                else:
+                    row[f"{exact_col}_mean"] = f"{v:.{DECIMAL_PLACES}f}"
+                    row[f"{exact_col}_std"] = f"0.{('0' * (DECIMAL_PLACES - 1))}0" if DECIMAL_PLACES > 0 else "0"
+                    row[f"{exact_col}_mean_std"] = f"{v:.{DECIMAL_PLACES}f}"
+                    row[f"{exact_col}_median"] = f"{v:.{DECIMAL_PLACES}f}"
+            else:
+                row[f"{exact_col}_mean"] = "N/A"
+                row[f"{exact_col}_std"] = "N/A"
+                row[f"{exact_col}_mean_std"] = "N/A"
+                row[f"{exact_col}_median"] = "N/A"
+
+        # For other numeric columns, use only passing trials from stats window.
         for col in numeric_cols:
-            if num_pass > 0:
-                values = passing_trials[col].dropna()
+            if col in EXACT_FIRST_TRIAL_COLS:
+                continue
+
+            if len(stats_passing_trials) > 0:
+                values = stats_passing_trials[col].dropna()
                 if len(values) > 0:
                     mean_val = values.mean()
                     std_val = values.std(
@@ -151,10 +214,10 @@ def aggregate_benchmarks(input_file: str, output_file: str = None) -> pd.DataFra
                     median_val = values.median()
 
                     # Format: mean ± std
-                    row[f"{col}_mean"] = f"{mean_val:.2f}"
-                    row[f"{col}_std"] = f"{std_val:.2f}"
-                    row[f"{col}_mean_std"] = f"{mean_val:.2f} ± {std_val:.2f}"
-                    row[f"{col}_median"] = f"{median_val:.2f}"
+                    row[f"{col}_mean"] = f"{mean_val:.{DECIMAL_PLACES}f}"
+                    row[f"{col}_std"] = f"{std_val:.{DECIMAL_PLACES}f}"
+                    row[f"{col}_mean_std"] = f"{mean_val:.{DECIMAL_PLACES}f} ± {std_val:.{DECIMAL_PLACES}f}"
+                    row[f"{col}_median"] = f"{median_val:.{DECIMAL_PLACES}f}"
                 else:
                     row[f"{col}_mean"] = "N/A"
                     row[f"{col}_std"] = "N/A"
@@ -191,10 +254,33 @@ def create_summary_table(input_file: str, output_file: str = None) -> pd.DataFra
 
     group_cols = ["approach", "dataset_size", "k_value"]
 
+    def format_mean_std(series: pd.Series, decimals: int = 2) -> str:
+        return f"{series.mean():.{decimals}f} ± {series.std(ddof=0):.{decimals}f}"
+
+    summary_metric_specs = [
+        ("setup_keygen_s", "setup_keygen", DECIMAL_PLACES),
+        ("setup_rotkeygen_s", "setup_rotkeygen", DECIMAL_PLACES),
+        ("setup_db_encrypt_s", "setup_db_encrypt", DECIMAL_PLACES),
+        ("setup_diag_prerot_s", "setup_diag_prerot", DECIMAL_PLACES),
+        ("setup_gpu_key_upload_s", "setup_gpu_key_upload", DECIMAL_PLACES),
+        ("setup_gpu_db_cache_s", "setup_gpu_db_cache", DECIMAL_PLACES),
+        ("setup_offline_total_s", "setup_offline_total", DECIMAL_PLACES),
+        ("setup_total_s", "setup_total", DECIMAL_PLACES),
+        ("wall_time_s", "wall_time", DECIMAL_PLACES),
+        ("enroll_time_s", "enroll_time", DECIMAL_PLACES),
+        ("membership_time_s", "membership_time", DECIMAL_PLACES),
+        ("index_time_s", "index_time", DECIMAL_PLACES),
+        ("peak_ram_gb", "peak_ram_gb", DECIMAL_PLACES),
+        ("peak_disk_gb", "peak_disk_gb", DECIMAL_PLACES),
+        ("peak_gpu_gb", "peak_gpu_gb", DECIMAL_PLACES),
+    ]
+
     results = []
 
     for name, group in df.groupby(group_cols):
         approach, dataset_size, k_value = name
+        ordered = ordered_group(group)
+        stats_group = stats_window(group)
 
         num_pass = (group["success"] == "PASS").sum()
         num_total = len(group)
@@ -208,32 +294,21 @@ def create_summary_table(input_file: str, output_file: str = None) -> pd.DataFra
 
         # Use only passing trials for computing statistics
         passing_trials = group[group["success"] == "PASS"]
+        stats_passing_trials = stats_group[stats_group["success"] == "PASS"]
+
+        # Keep output backward-compatible: include only metrics that exist in input CSV
+        active_metric_specs = [spec for spec in summary_metric_specs if spec[0] in df.columns]
 
         if num_pass > 0:
-            # Wall time
-            wall = passing_trials["wall_time_s"]
-            row["wall_time"] = f"{wall.mean():.1f} ± {wall.std(ddof=0):.1f}"
+            for in_col, out_col, decimals in active_metric_specs:
+                if in_col in EXACT_FIRST_TRIAL_COLS:
+                    # Keep the exact trial-1 value for setup metrics and disk use.
+                    exact_v = ordered[in_col].dropna()
+                    row[out_col] = f"{float(exact_v.iloc[0]):.{decimals}f}" if len(exact_v) > 0 else "N/A"
+                    continue
 
-            # Enrollment (optional)
-            if "enroll_time_s" in passing_trials.columns:
-                enroll = passing_trials["enroll_time_s"]
-                row["enroll_time"] = f"{enroll.mean():.2f} ± {enroll.std(ddof=0):.2f}"
-
-            # Membership
-            memb = passing_trials["membership_time_s"]
-            row["membership_time"] = f"{memb.mean():.2f} ± {memb.std(ddof=0):.2f}"
-
-            # Index
-            idx = passing_trials["index_time_s"]
-            row["index_time"] = f"{idx.mean():.2f} ± {idx.std(ddof=0):.2f}"
-
-            # RAM
-            ram = passing_trials["peak_ram_gb"]
-            row["peak_ram_gb"] = f"{ram.mean():.1f} ± {ram.std(ddof=0):.1f}"
-
-            # Disk
-            disk = passing_trials["peak_disk_gb"]
-            row["peak_disk_gb"] = f"{disk.mean():.1f} ± {disk.std(ddof=0):.1f}"
+                values = stats_passing_trials[in_col].dropna()
+                row[out_col] = format_mean_std(values, decimals) if len(values) > 0 else "N/A"
 
             # Correctness (from passing trials only)
             row["membership_correct"] = (
@@ -245,13 +320,8 @@ def create_summary_table(input_file: str, output_file: str = None) -> pd.DataFra
                 "PASS" if (passing_trials["index_pass"] == "PASS").all() else "FAIL"
             )
         else:
-            row["wall_time"] = "N/A"
-            if "enroll_time_s" in df.columns:
-                row["enroll_time"] = "N/A"
-            row["membership_time"] = "N/A"
-            row["index_time"] = "N/A"
-            row["peak_ram_gb"] = "N/A"
-            row["peak_disk_gb"] = "N/A"
+            for _, out_col, _ in active_metric_specs:
+                row[out_col] = "N/A"
             row["membership_correct"] = "N/A"
             row["index_correct"] = "N/A"
 

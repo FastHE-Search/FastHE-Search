@@ -356,6 +356,14 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
+	// Setup/offline instrumentation metrics (seconds)
+	double keyGenTime	  = 0.0;
+	double rotKeyGenTime  = 0.0;
+	double dbEncryptTime  = 0.0;
+	double diagPreRotTime = 0.0;
+	double gpuKeyUploadTime = 0.0;
+	double gpuDBCacheTime = 0.0;
+
 	// Compute required multiplicative depth based on approach used
 	// Write approach used to stdout and experiment .csv file
 	size_t multDepth = OpenFHEWrapper::computeRequiredDepth(static_cast<size_t>(expApproach));
@@ -456,6 +464,7 @@ int main(int argc, char* argv[]) {
 		batchSize = cc->GetEncodingParams()->GetBatchSize();
 
 		cout << "Generating key pair... " << endl;
+		auto keyGenStart = chrono::steady_clock::now();
 		auto keyPair = cc->KeyGen();
 		pk			 = keyPair.publicKey;
 		sk			 = keyPair.secretKey;
@@ -465,6 +474,8 @@ int main(int argc, char* argv[]) {
 
 		cout << "Generating sum keys... " << endl;
 		cc->EvalSumKeyGen(sk);
+		auto keyGenEnd = chrono::steady_clock::now();
+		keyGenTime	 = chrono::duration<double>(keyGenEnd - keyGenStart).count();
 
 		cout << "Generating rotation keys... " << endl;
 		vector<int> rotationFactors;
@@ -584,7 +595,10 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
+		auto rotKeyStart = chrono::steady_clock::now();
 		cc->EvalRotateKeyGen(sk, rotationFactors);
+		auto rotKeyEnd = chrono::steady_clock::now();
+		rotKeyGenTime = chrono::duration<double>(rotKeyEnd - rotKeyStart).count();
 	}
 
 	// OpenFHEWrapper::printSchemeDetails(parameters, cc);
@@ -602,6 +616,7 @@ int main(int argc, char* argv[]) {
 	// Serialize the context, keys and database vectors if not already
 	vector<vector<double>> plaintextVectors(numVectors, vector<double>(VECTOR_DIM));
 	double encDBVectorsTime = 0;
+	diagPreRotTime			  = 0.0;
 	if (!loadDatabaseFromSerial) {
 
 		cout << "Reading database vectors from file... " << endl;
@@ -650,14 +665,17 @@ int main(int argc, char* argv[]) {
 			static_cast<DiagonalBSGSPrecompOptEnroller*>(enroller)->serializeDB(plaintextVectors);
 		} else if (expApproach == ExperimentalApproach::BSGSGPUPreRot) {
 			// Approach 812: pre-rotate diagonals in plaintext before encryption
-			enroller = new DiagonalBSGSPreRotEnroller(cc, pk, numVectors);
-			static_cast<DiagonalBSGSPreRotEnroller*>(enroller)->serializeDB(plaintextVectors);
+			auto* preRotEnroller = new DiagonalBSGSPreRotEnroller(cc, pk, numVectors);
+			enroller				 = preRotEnroller;
+			preRotEnroller->serializeDB(plaintextVectors);
+			diagPreRotTime = preRotEnroller->getLastPreRotationTimeSec();
 		}
 		delete enroller;
 		{
 			auto enrollEnd	 = chrono::steady_clock::now();
 			encDBVectorsTime = chrono::duration<double>(enrollEnd - enrollStart).count();
-			cout << "encrypt DB vectors done (" << encDBVectorsTime << "s)" << endl;
+			dbEncryptTime	 = std::max(0.0, encDBVectorsTime - diagPreRotTime);
+			cout << "encrypt DB vectors done (" << fixed << setprecision(4) << encDBVectorsTime << "s)" << endl;
 		}
 
 		Serial::SerializeToFile("serial/cryptocontext.bin", cc, SerType::BINARY);
@@ -693,6 +711,9 @@ int main(int argc, char* argv[]) {
 		} else {
 			cerr << "Error serializing sum keys" << endl;
 		}
+	}
+	if (loadDatabaseFromSerial) {
+		dbEncryptTime = 0.0;
 	}
 	fileStream.close();
 
@@ -770,7 +791,10 @@ int main(int argc, char* argv[]) {
 		keys.publicKey		   = pk;
 		keys.secretKey		   = sk;
 		vector<int> gpuDevices = gpuDeviceList;
+		auto gpuInitStart	   = chrono::steady_clock::now();
 		gpuHelper			   = new GPUHydiaHelper(cc, keys, gpuDevices, batchSize);
+		auto gpuInitEnd		   = chrono::steady_clock::now();
+		gpuKeyUploadTime += chrono::duration<double>(gpuInitEnd - gpuInitStart).count();
 
 		if (!gpuHelper->isReady()) {
 			cerr << "[HyDia-GPU] GPU initialization failed, falling back to CPU "
@@ -835,11 +859,15 @@ int main(int argc, char* argv[]) {
 
 			if (!useBulkMode) {
 				cout << "[HyDia-GPU] Streaming diagonals disk→GPU (default mode)" << endl;
+				auto cacheStart = chrono::steady_clock::now();
 				gpuSender->streamDiagonalsFromDisk("serial");
+				auto cacheEnd = chrono::steady_clock::now();
+				gpuDBCacheTime += chrono::duration<double>(cacheEnd - cacheStart).count();
 			} else {
 				cout << "[HyDia-GPU] Loading diagonals to GPU (bulk mode, "
 						"GPU_STREAM_DIAGS=0)..."
 					 << endl;
+				auto cacheStart = chrono::steady_clock::now();
 				auto loadStart = chrono::steady_clock::now();
 
 				vector<Ciphertext<DCRTPoly>> preloadedDiagonals;
@@ -861,6 +889,8 @@ int main(int argc, char* argv[]) {
 				cout << "[HyDia-GPU] Loaded " << numDiagonals << " diagonals in " << loadTime << "s" << endl;
 
 				gpuSender->initializeGPUCache(preloadedDiagonals);
+					auto cacheEnd = chrono::steady_clock::now();
+					gpuDBCacheTime += chrono::duration<double>(cacheEnd - cacheStart).count();
 			}
 		}
 #else
@@ -883,7 +913,10 @@ int main(int argc, char* argv[]) {
 		keys.publicKey		   = pk;
 		keys.secretKey		   = sk;
 		vector<int> gpuDevices = gpuDeviceList;
+		auto gpuInitStart	   = chrono::steady_clock::now();
 		gpuHelper			   = new GPUHydiaHelper(cc, keys, gpuDevices, batchSize);
+		auto gpuInitEnd		   = chrono::steady_clock::now();
+		gpuKeyUploadTime += chrono::duration<double>(gpuInitEnd - gpuInitStart).count();
 
 		if (!gpuHelper->isReady()) {
 			cerr << "[BSGS-Simple-GPU] GPU initialization failed, falling back to "
@@ -959,11 +992,15 @@ int main(int argc, char* argv[]) {
 
 				if (!useBulkMode81) {
 					cout << "[BSGS-Simple-GPU] Streaming diagonals disk→GPU (default mode)" << endl;
+					auto cacheStart = chrono::steady_clock::now();
 					gpuSender->streamDiagonalsFromDisk("serial");
+					auto cacheEnd = chrono::steady_clock::now();
+					gpuDBCacheTime += chrono::duration<double>(cacheEnd - cacheStart).count();
 				} else {
 					cout << "[BSGS-Simple-GPU] Loading diagonals to GPU (bulk mode, "
 							"GPU_STREAM_DIAGS=0)..."
 						 << endl;
+					auto cacheStart = chrono::steady_clock::now();
 					auto loadStart = chrono::steady_clock::now();
 
 					vector<Ciphertext<DCRTPoly>> preloadedDiagonals;
@@ -985,6 +1022,8 @@ int main(int argc, char* argv[]) {
 					cout << "[BSGS-Simple-GPU] Loaded " << numDiagonals << " diagonals in " << loadTime << "s" << endl;
 
 					gpuSender->initializeGPUCache(preloadedDiagonals);
+						auto cacheEnd = chrono::steady_clock::now();
+						gpuDBCacheTime += chrono::duration<double>(cacheEnd - cacheStart).count();
 				}
 
 				// Pre-initialize Simple BSGS rotation keys on GPU
@@ -997,6 +1036,7 @@ int main(int argc, char* argv[]) {
 				gpuHelper->InitializeSimpleBSGSRotationKeysOnGPU(n1, VECTOR_DIM, batchSize);
 				auto keyInitEnd	   = chrono::steady_clock::now();
 				double keyInitTime = chrono::duration<double>(keyInitEnd - keyInitStart).count();
+				gpuKeyUploadTime += keyInitTime;
 				cout << "[BSGS-Simple-GPU] Rotation keys pre-initialized in " << fixed << setprecision(2) << keyInitTime << "s" << endl;
 			}
 		}
@@ -1021,7 +1061,10 @@ int main(int argc, char* argv[]) {
 		keys.publicKey		   = pk;
 		keys.secretKey		   = sk;
 		vector<int> gpuDevices = gpuDeviceList;
+		auto gpuInitStart	   = chrono::steady_clock::now();
 		gpuHelper			   = new GPUHydiaHelper(cc, keys, gpuDevices, batchSize);
+		auto gpuInitEnd		   = chrono::steady_clock::now();
+		gpuKeyUploadTime += chrono::duration<double>(gpuInitEnd - gpuInitStart).count();
 
 		if (!gpuHelper->isReady()) {
 			cerr << "[BSGS-GPU-PreRot] GPU initialization failed, falling back to "
@@ -1094,11 +1137,15 @@ int main(int argc, char* argv[]) {
 					cout << "[BSGS-GPU-PreRot] Streaming pre-rotated diagonals disk→GPU "
 							"(default mode)"
 						 << endl;
+					auto cacheStart = chrono::steady_clock::now();
 					gpuSender->streamDiagonalsFromDisk("serial");
+					auto cacheEnd = chrono::steady_clock::now();
+					gpuDBCacheTime += chrono::duration<double>(cacheEnd - cacheStart).count();
 				} else {
 					cout << "[BSGS-GPU-PreRot] Loading pre-rotated diagonals to GPU "
 							"(bulk mode)..."
 						 << endl;
+					auto cacheStart = chrono::steady_clock::now();
 					auto loadStart = chrono::steady_clock::now();
 
 					vector<Ciphertext<DCRTPoly>> preloadedDiagonals;
@@ -1120,6 +1167,8 @@ int main(int argc, char* argv[]) {
 					cout << "[BSGS-GPU-PreRot] Loaded " << numDiagonals << " diagonals in " << loadTime << "s" << endl;
 
 					gpuSender->initializeGPUCache(preloadedDiagonals);
+						auto cacheEnd = chrono::steady_clock::now();
+						gpuDBCacheTime += chrono::duration<double>(cacheEnd - cacheStart).count();
 				}
 
 				// Pre-initialize BSGS rotation keys on GPU (same as 81, but no negative
@@ -1131,6 +1180,7 @@ int main(int argc, char* argv[]) {
 				gpuHelper->InitializeSimpleBSGSRotationKeysOnGPU(n1, VECTOR_DIM, batchSize);
 				auto keyInitEnd	   = chrono::steady_clock::now();
 				double keyInitTime = chrono::duration<double>(keyInitEnd - keyInitStart).count();
+				gpuKeyUploadTime += keyInitTime;
 				cout << "[BSGS-GPU-PreRot] Rotation keys pre-initialized in " << fixed << setprecision(2) << keyInitTime << "s" << endl;
 			}
 		}
@@ -1144,6 +1194,21 @@ int main(int argc, char* argv[]) {
 		break;
 	}
 	}
+
+	// Structured setup-cost summary for benchmark parsing/reporting.
+	if (encDBVectorsTime > 0.0 && dbEncryptTime <= 0.0) {
+		dbEncryptTime = encDBVectorsTime;
+	}
+	double offlineTotalTime = keyGenTime + rotKeyGenTime + dbEncryptTime + diagPreRotTime;
+	double setupTotalTime   = offlineTotalTime + gpuKeyUploadTime + gpuDBCacheTime;
+	cout << "[SETUP_COSTS] KeyGen=" << fixed << setprecision(4) << keyGenTime << "s"
+		 << " RotKeyGen=" << fixed << setprecision(4) << rotKeyGenTime << "s"
+		 << " DBEncrypt=" << fixed << setprecision(4) << dbEncryptTime << "s"
+		 << " DiagPreRot=" << fixed << setprecision(4) << diagPreRotTime << "s"
+		 << " GPUKeyUpload=" << fixed << setprecision(4) << gpuKeyUploadTime << "s"
+		 << " GPUDBCache=" << fixed << setprecision(4) << gpuDBCacheTime << "s"
+		 << " OfflineTotal=" << fixed << setprecision(4) << offlineTotalTime << "s"
+		 << " SetupTotal=" << fixed << setprecision(4) << setupTotalTime << "s" << endl;
 
 	// Track baseline memory after setup
 	size_t baselineMemKB = 0;
@@ -1177,7 +1242,7 @@ int main(int argc, char* argv[]) {
 	end			 = chrono::steady_clock::now();
 	duration	 = end - start;
 	encQueryTime = duration.count();
-	cout << "done (" << encQueryTime << "s)" << endl;
+	cout << "done (" << fixed << setprecision(4) << encQueryTime << "s)" << endl;
 	expStream << encQueryTime << "," << flush;		 // report query encryption time
 	expStream << queryCipher.size() << "," << flush; // report query communication overhead
 
@@ -1191,7 +1256,7 @@ int main(int argc, char* argv[]) {
 		gpuHelper->ComputeAndCacheBabyStepsOnGPU(queryCipher[0], nBaby);
 		auto babyEnd	= chrono::steady_clock::now();
 		double babyTime = chrono::duration<double>(babyEnd - babyStart).count();
-		cout << "done (" << fixed << setprecision(2) << babyTime << "s)" << endl;
+		cout << "done (" << fixed << setprecision(4) << babyTime << "s)" << endl;
 		cout << "[GPUHydiaHelper] " << nBaby << " baby steps cached on GPU memory" << endl;
 	} else if (gpuHelper != nullptr && expApproach == ExperimentalApproach::HyDiaGPU) {
 		cout << "[GPUHydiaHelper] Caching " << VECTOR_DIM << " diagonal rotations on GPU... " << flush;
@@ -1199,7 +1264,7 @@ int main(int argc, char* argv[]) {
 		gpuHelper->ComputeAndCacheBabyStepsOnGPU(queryCipher[0], static_cast<int>(VECTOR_DIM));
 		auto babyEnd	= chrono::steady_clock::now();
 		double babyTime = chrono::duration<double>(babyEnd - babyStart).count();
-		cout << "done (" << fixed << setprecision(2) << babyTime << "s)" << endl;
+		cout << "done (" << fixed << setprecision(4) << babyTime << "s)" << endl;
 		cout << "[GPUHydiaHelper] " << VECTOR_DIM << " rotations cached on GPU memory" << endl;
 	}
 #endif
@@ -1211,7 +1276,7 @@ int main(int argc, char* argv[]) {
 	end									  = chrono::steady_clock::now();
 	duration							  = end - start;
 	membCompTime						  = duration.count();
-	cout << "done (wall: " << membCompTime << "s)" << endl;
+	cout << "done (wall: " << fixed << setprecision(4) << membCompTime << "s)" << endl;
 	expStream << membCompTime << "," << flush; // report membership computation time
 	expStream << 1 << "," << flush;			   // report membership communication overhead
 
@@ -1224,7 +1289,7 @@ int main(int argc, char* argv[]) {
 	end				 = chrono::steady_clock::now();
 	duration		 = end - start;
 	membDecTime		 = duration.count();
-	cout << "done (" << membDecTime << "s)" << endl;
+	cout << "done (" << fixed << setprecision(4) << membDecTime << "s)" << endl;
 	expStream << membDecTime << "," << flush;
 
 	// Perform index scenario (skip for Approach 9 — membership-only approach)
@@ -1240,7 +1305,7 @@ int main(int argc, char* argv[]) {
 		end				 = chrono::steady_clock::now();
 		duration		 = end - start;
 		idxCompTime		 = duration.count();
-		cout << "done (wall: " << idxCompTime << "s)" << endl;
+		cout << "done (wall: " << fixed << setprecision(4) << idxCompTime << "s)" << endl;
 		expStream << idxCompTime << "," << flush;		 // report index computation time
 		expStream << indexCipher.size() << "," << flush; // report index communication overhead
 
@@ -1252,7 +1317,7 @@ int main(int argc, char* argv[]) {
 		end			 = chrono::steady_clock::now();
 		duration	 = end - start;
 		idxDecTime	 = duration.count();
-		cout << "done (" << idxDecTime << "s)" << endl;
+		cout << "done (" << fixed << setprecision(4) << idxDecTime << "s)" << endl;
 		expStream << idxDecTime << "," << flush;
 	}
 

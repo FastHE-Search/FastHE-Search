@@ -36,9 +36,15 @@ class DiagonalBSGSPreRotEnroller : public DiagonalEnroller {
 	/// Serialize database with plaintext pre-rotation of diagonals.
 	void serializeDB(vector<vector<double>>& database);
 
+	/// Returns the time spent only in plaintext pre-rotation for the last run.
+	double getLastPreRotationTimeSec() const {
+		return lastPreRotationTimeSec_;
+	}
+
   protected:
 	size_t babyStepSize_;
 	size_t giantStepSize_;
+	double lastPreRotationTimeSec_ = 0.0;
 
 	/// Apply CKKS-slot-level cyclic left-shift to a plaintext row.
 	/// Within each VECTOR_DIM block, shifts by `amount` positions cyclically.

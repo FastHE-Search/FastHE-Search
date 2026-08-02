@@ -311,14 +311,58 @@ def parse_output(output):
         "enroll": 0.0,
         "membership": 0.0,
         "index": 0.0,
+        "setup_keygen": 0.0,
+        "setup_rotkeygen": 0.0,
+        "setup_db_encrypt": 0.0,
+        "setup_diag_prerot": 0.0,
+        "setup_gpu_key_upload": 0.0,
+        "setup_gpu_db_cache": 0.0,
+        "setup_offline_total": 0.0,
+        "setup_total": 0.0,
+        "setup_costs_found": False,
+        "fatal_error": False,
         "membership_result": None,  # True/False/None
         "found_indices": [],
     }
+
+    result["fatal_error"] = bool(re.search(r"FATAL:\s", output))
 
     # Enrollment time: "encrypt DB vectors done (32.6528s)"
     enroll_match = re.search(r"encrypt DB vectors done\s*\(([\d.]+)s\)", output)
     if enroll_match:
         result["enroll"] = float(enroll_match.group(1))
+
+    # Setup/offline costs summary (structured line from ImageMatching).
+    setup_costs = re.search(
+        r"\[SETUP_COSTS\].*?"
+        r"KeyGen=([\d.]+)s.*?"
+        r"RotKeyGen=([\d.]+)s.*?"
+        r"DBEncrypt=([\d.]+)s.*?"
+        r"DiagPreRot=([\d.]+)s.*?"
+        r"GPUKeyUpload=([\d.]+)s.*?"
+        r"GPUDBCache=([\d.]+)s.*?"
+        r"OfflineTotal=([\d.]+)s.*?"
+        r"SetupTotal=([\d.]+)s",
+        output,
+        re.DOTALL,
+    )
+    if setup_costs:
+        result["setup_keygen"] = float(setup_costs.group(1))
+        result["setup_rotkeygen"] = float(setup_costs.group(2))
+        result["setup_db_encrypt"] = float(setup_costs.group(3))
+        result["setup_diag_prerot"] = float(setup_costs.group(4))
+        result["setup_gpu_key_upload"] = float(setup_costs.group(5))
+        result["setup_gpu_db_cache"] = float(setup_costs.group(6))
+        result["setup_offline_total"] = float(setup_costs.group(7))
+        result["setup_total"] = float(setup_costs.group(8))
+        result["setup_costs_found"] = True
+
+    # Fallback for runs that abort before printing [SETUP_COSTS] but still
+    # complete expensive DB encryption/setup work.
+    if not result["setup_costs_found"] and result["enroll"] > 0.0:
+        result["setup_db_encrypt"] = result["enroll"]
+        result["setup_offline_total"] = result["enroll"]
+        result["setup_total"] = result["enroll"]
 
     # PRIMARY: Parse from final timing summary string (most reliable)
     # Format: "[TIMESTAMP] DB=2^14 Approach=81 N=512 EncQuery=0.0896s MembComp=0.7915s MembDec=0.0259s IdxComp=0.4729s IdxDec=0.0251s MembResult=SUCCESS"
@@ -538,16 +582,20 @@ def run_benchmark(approach, expected_indices, mult_depth=None, scale_factor=None
     reader.start()
 
     saw_output = False
-    while True:
+    reader_done = False
+    while not reader_done:
         try:
             line = output_queue.get(timeout=0.2)
         except queue.Empty:
-            if process.poll() is not None:
+            # Keep waiting while the reader thread may still have buffered lines
+            # to enqueue. This avoids losing trailing output right after process exit.
+            if process.poll() is not None and not reader.is_alive():
                 break
             continue
 
         if line is None:
-            break
+            reader_done = True
+            continue
 
         saw_output = True
         combined_lines.append(line)
@@ -565,16 +613,28 @@ def run_benchmark(approach, expected_indices, mult_depth=None, scale_factor=None
             f"    | [no subprocess output captured for approach {approach}]", flush=True
         )
 
-    # Check if process terminated successfully
-    success = process.returncode == 0
+    parsed = parse_output(stdout)
+
+    # Treat explicit fatal runtime messages as benchmark failure even if the
+    # process exits with code 0.
+    success = process.returncode == 0 and not parsed["fatal_error"]
 
     if not success:
-        print(f"    ❌ Failed: {stdout[:200]}")
+        fail_reason = "fatal runtime error" if parsed["fatal_error"] else "non-zero exit"
+        print(f"    ❌ Failed ({fail_reason}): {stdout[:200]}")
         return {
             "wall_time": wall_time,
-            "enroll_time": 0.0,
-            "membership_time": 0.0,
-            "index_time": 0.0,
+            "enroll_time": parsed["enroll"],
+            "membership_time": parsed["membership"],
+            "index_time": parsed["index"],
+            "setup_keygen_s": parsed["setup_keygen"],
+            "setup_rotkeygen_s": parsed["setup_rotkeygen"],
+            "setup_db_encrypt_s": parsed["setup_db_encrypt"],
+            "setup_diag_prerot_s": parsed["setup_diag_prerot"],
+            "setup_gpu_key_upload_s": parsed["setup_gpu_key_upload"],
+            "setup_gpu_db_cache_s": parsed["setup_gpu_db_cache"],
+            "setup_offline_total_s": parsed["setup_offline_total"],
+            "setup_total_s": parsed["setup_total"],
             "peak_ram_gb": peak_ram,
             "peak_disk_gb": peak_disk,
             "peak_gpu_gb": peak_gpu,
@@ -582,10 +642,8 @@ def run_benchmark(approach, expected_indices, mult_depth=None, scale_factor=None
             "membership_pass": False,
             "index_pass": False,
             "missed_indices": list(expected_indices),
-            "found_indices": [],
+            "found_indices": parsed["found_indices"],
         }
-
-    parsed = parse_output(stdout)
 
     write_serial_signature(serial_signature)
 
@@ -608,6 +666,14 @@ def run_benchmark(approach, expected_indices, mult_depth=None, scale_factor=None
         "enroll_time": parsed["enroll"],
         "membership_time": parsed["membership"],
         "index_time": parsed["index"],
+        "setup_keygen_s": parsed["setup_keygen"],
+        "setup_rotkeygen_s": parsed["setup_rotkeygen"],
+        "setup_db_encrypt_s": parsed["setup_db_encrypt"],
+        "setup_diag_prerot_s": parsed["setup_diag_prerot"],
+        "setup_gpu_key_upload_s": parsed["setup_gpu_key_upload"],
+        "setup_gpu_db_cache_s": parsed["setup_gpu_db_cache"],
+        "setup_offline_total_s": parsed["setup_offline_total"],
+        "setup_total_s": parsed["setup_total"],
         "peak_ram_gb": peak_ram,
         "peak_disk_gb": peak_disk,
         "peak_gpu_gb": peak_gpu,
@@ -648,19 +714,19 @@ def run_all_benchmarks(build_type, approaches, expected_indices, trial=1):
             idx_status = "✓" if result["index_pass"] else "✗"
 
             print(
-                f"    {status} Wall: {result['wall_time']:.1f}s | "
-                f"Enroll: {result['enroll_time']:.1f}s | "
-                f"Membership: {result['membership_time']:.1f}s | "
-                f"Index: {result['index_time']:.1f}s"
+                f"    {status} Wall: {result['wall_time']:.4f}s | "
+                f"Enroll: {result['enroll_time']:.4f}s | "
+                f"Membership: {result['membership_time']:.4f}s | "
+                f"Index: {result['index_time']:.4f}s"
             )
             gpu_str = (
-                f" | GPU: {result['peak_gpu_gb']:.2f} GB"
+                f" | GPU: {result['peak_gpu_gb']:.4f} GB"
                 if result["peak_gpu_gb"] is not None
                 else ""
             )
             print(
-                f"       RAM: {result['peak_ram_gb']:.2f} GB | "
-                f"Disk: {result['peak_disk_gb']:.2f} GB{gpu_str} | "
+                f"       RAM: {result['peak_ram_gb']:.4f} GB | "
+                f"Disk: {result['peak_disk_gb']:.4f} GB{gpu_str} | "
                 f"Membership: {mem_status} | Index: {idx_status}"
             )
 
@@ -684,6 +750,14 @@ def write_results(results, output_file, append=False):
         "success",
         "membership_pass",
         "index_pass",
+        "setup_keygen_s",
+        "setup_rotkeygen_s",
+        "setup_db_encrypt_s",
+        "setup_diag_prerot_s",
+        "setup_gpu_key_upload_s",
+        "setup_gpu_db_cache_s",
+        "setup_offline_total_s",
+        "setup_total_s",
         "wall_time_s",
         "enroll_time_s",
         "membership_time_s",
@@ -715,14 +789,22 @@ def write_results(results, output_file, append=False):
                     "success": "PASS" if r["success"] else "FAIL",
                     "membership_pass": "PASS" if r["membership_pass"] else "FAIL",
                     "index_pass": "PASS" if r["index_pass"] else "FAIL",
-                    "wall_time_s": f"{r['wall_time']:.2f}",
-                    "enroll_time_s": f"{r['enroll_time']:.2f}",
-                    "membership_time_s": f"{r['membership_time']:.2f}",
-                    "index_time_s": f"{r['index_time']:.2f}",
-                    "peak_ram_gb": f"{r['peak_ram_gb']:.2f}",
-                    "peak_disk_gb": f"{r['peak_disk_gb']:.2f}",
+                    "setup_keygen_s": f"{r['setup_keygen_s']:.4f}",
+                    "setup_rotkeygen_s": f"{r['setup_rotkeygen_s']:.4f}",
+                    "setup_db_encrypt_s": f"{r['setup_db_encrypt_s']:.4f}",
+                    "setup_diag_prerot_s": f"{r['setup_diag_prerot_s']:.4f}",
+                    "setup_gpu_key_upload_s": f"{r['setup_gpu_key_upload_s']:.4f}",
+                    "setup_gpu_db_cache_s": f"{r['setup_gpu_db_cache_s']:.4f}",
+                    "setup_offline_total_s": f"{r['setup_offline_total_s']:.4f}",
+                    "setup_total_s": f"{r['setup_total_s']:.4f}",
+                    "wall_time_s": f"{r['wall_time']:.4f}",
+                    "enroll_time_s": f"{r['enroll_time']:.4f}",
+                    "membership_time_s": f"{r['membership_time']:.4f}",
+                    "index_time_s": f"{r['index_time']:.4f}",
+                    "peak_ram_gb": f"{r['peak_ram_gb']:.4f}",
+                    "peak_disk_gb": f"{r['peak_disk_gb']:.4f}",
                     "peak_gpu_gb": (
-                        f"{r['peak_gpu_gb']:.2f}"
+                        f"{r['peak_gpu_gb']:.4f}"
                         if r["peak_gpu_gb"] is not None
                         else ""
                     ),
@@ -744,16 +826,38 @@ def print_summary(results):
         success = "✓" if r["success"] else "✗"
         mem = "✓" if r["membership_pass"] else "✗"
         idx = "✓" if r["index_pass"] else "✗"
-        gpu_val = f"{r['peak_gpu_gb']:.2f}" if r["peak_gpu_gb"] is not None else "-"
+        gpu_val = f"{r['peak_gpu_gb']:.4f}" if r["peak_gpu_gb"] is not None else "-"
         print(
             f"{r['build_type']:<26} {r['approach']:<18} "
             f"{success:<8} {mem:<5} {idx:<5} "
-            f"{r['wall_time']:<9.2f} {r['enroll_time']:<10.2f} "
-            f"{r['membership_time']:<10.2f} {r['index_time']:<10.2f} "
-            f"{r['peak_ram_gb']:<8.2f} {r['peak_disk_gb']:<9.2f} {gpu_val:<8}"
+            f"{r['wall_time']:<9.4f} {r['enroll_time']:<10.4f} "
+            f"{r['membership_time']:<10.4f} {r['index_time']:<10.4f} "
+            f"{r['peak_ram_gb']:<8.4f} {r['peak_disk_gb']:<9.4f} {gpu_val:<8}"
         )
 
     print("=" * 140)
+
+
+def print_setup_costs_summary(results):
+    """Print separate setup/offline costs table."""
+    print("\n" + "=" * 156)
+    print("🧱 SETUP/OFFLINE COSTS SUMMARY")
+    print("=" * 156)
+    print(
+        f"{'Build Type':<26} {'Approach':<18} {'KeyGen(s)':<10} {'RotKey(s)':<10} {'DBEnc(s)':<10} {'PreRot(s)':<10} {'GPUKeyUp(s)':<12} {'GPUCache(s)':<11} {'Offline(s)':<11} {'SetupTotal(s)':<13}"
+    )
+    print("-" * 156)
+
+    for r in results:
+        print(
+            f"{r['build_type']:<26} {r['approach']:<18} "
+            f"{r['setup_keygen_s']:<10.4f} {r['setup_rotkeygen_s']:<10.4f} "
+            f"{r['setup_db_encrypt_s']:<10.4f} {r['setup_diag_prerot_s']:<10.4f} "
+            f"{r['setup_gpu_key_upload_s']:<12.4f} {r['setup_gpu_db_cache_s']:<11.4f} "
+            f"{r['setup_offline_total_s']:<11.4f} {r['setup_total_s']:<13.4f}"
+        )
+
+    print("=" * 156)
 
 
 def main():
@@ -864,6 +968,7 @@ def main():
 
     # Print summary
     print_summary(results)
+    print_setup_costs_summary(results)
 
     return 0
 
