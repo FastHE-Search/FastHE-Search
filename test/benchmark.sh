@@ -177,7 +177,7 @@ for arg in "$@"; do
             echo "  approaches=[...]           Generic alias applied to active build mode(s)"
             echo "  approaches_gpu=[51,81,812] Approaches for GPU build (default)"
             echo "  approaches_cpu=[5,8]       Approaches for CPU build (default)"
-            echo "  gpus=0,1,...               Explicit GPU shard list for approaches 81/812"
+            echo "  gpus=0,1,...               Explicit GPU device list for multi-GPU sharding"
             echo ""
             echo "Available approaches:"
             echo "  5   - HyDia_CPU (baseline)"
@@ -265,8 +265,9 @@ run_benchmark() {
     # Run benchmark (logn and kmatch are positional args, others are optional)
     # Pass trial number to Python script
     # Export BUILD_DIR and TEST_DATA_DIR for the Python script
+    # GPU_DEVICES is read directly by ImageMatching (see main.cpp) to select/shard GPUs
     cd "$SCRIPT_DIR"
-    CLEAN_SERIAL="$clean_serial" KEEP_SERIAL="$keep_serial" REUSE_KEYS_ONLY="$reuse_keys_only" BENCHMARK_BUILD_FLAVOR="$build_type" BUILD_DIR="$BUILD_DIR" TEST_DATA_DIR="$TEST_DATA_DIR" python3 benchmark_all.py "$logn" "$kmatch" --output_file "$output_csv" --trial "$trial" $extra_args
+    CLEAN_SERIAL="$clean_serial" KEEP_SERIAL="$keep_serial" REUSE_KEYS_ONLY="$reuse_keys_only" BENCHMARK_BUILD_FLAVOR="$build_type" BUILD_DIR="$BUILD_DIR" TEST_DATA_DIR="$TEST_DATA_DIR" GPU_DEVICES="$GPU_DEVICES_OVERRIDE" python3 benchmark_all.py "$logn" "$kmatch" --output_file "$output_csv" --trial "$trial" $extra_args
 }
 
 set_trial_serial_policy() {

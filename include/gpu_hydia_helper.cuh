@@ -220,7 +220,7 @@ class GPUHydiaHelper {
 	double gpuSafeMemoryLimitGB_ = -1.0;
 
 	// =========================================================================
-	// MULTI-GPU DATABASE SHARDING (Approaches 81 & 812)
+	// MULTI-GPU DATABASE SHARDING
 	// =========================================================================
 	// When constructed with more than one GPU device, this helper becomes a
 	// thin COORDINATOR that owns one independent single-GPU child helper per

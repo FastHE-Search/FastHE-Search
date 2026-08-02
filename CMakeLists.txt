@@ -273,6 +273,7 @@ if(USE_GPU)
             tbb
             pthread
             dl)
+  target_link_options(ImageMatching PRIVATE $<DEVICE_LINK:-dlto>)
   set_target_properties(ImageMatching PROPERTIES CUDA_SEPARABLE_COMPILATION ON
                                                  CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 endif()
@@ -340,6 +341,7 @@ if(USE_GPU)
             tbb
             pthread
             dl)
+  target_link_options(ImageMatchingAccuracy PRIVATE $<DEVICE_LINK:-dlto>)
   set_target_properties(
     ImageMatchingAccuracy PROPERTIES CUDA_SEPARABLE_COMPILATION ON
                                      CUDA_RESOLVE_DEVICE_SYMBOLS ON)

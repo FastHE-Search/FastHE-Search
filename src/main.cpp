@@ -290,7 +290,7 @@ int main(int argc, char* argv[]) {
 	bool keepSerialAfterRun = keepSerialRequested();
 	bool reuseKeysOnly		= false;
 
-	// Multi-GPU device selection (Approaches 81 & 812). Default: single GPU 0.
+	// Multi-GPU device selection. Default: single GPU 0.
 	// Accepts "--gpus 0,1,2,3" or "--gpus=0,1" on the command line, or the
 	// GPU_DEVICES environment variable (e.g. GPU_DEVICES=0,1). The database is
 	// sharded across the listed GPUs and kept hot on each from the setup phase.
@@ -342,7 +342,7 @@ int main(int argc, char* argv[]) {
 		}
 	}
 	if (gpuDeviceList.size() > 1) {
-		cout << "[main] Multi-GPU enabled (Approaches 81 & 812): devices = [";
+		cout << "[main] Multi-GPU enabled: devices = [";
 		for (size_t i = 0; i < gpuDeviceList.size(); ++i)
 			cout << gpuDeviceList[i] << (i + 1 < gpuDeviceList.size() ? ", " : "");
 		cout << "]" << endl;
