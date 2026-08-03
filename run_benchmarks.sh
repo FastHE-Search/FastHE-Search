@@ -157,30 +157,27 @@ log "Server-side membership/index overhead, sizes 2^10..2^14"
 log "Started at $(date)"
 log "=========================================="
 
-Literature baselines (GROTE=2, Blind=3, HERS=4) are CPU algorithms measured in
-BOTH builds to compare OpenFHE versions, exactly like HyDia approach 5.
-Note: only the server-side computation overhead is benchmarked; client-side
-decryption of these baselines may exceed CKKS approximation limits (an inherent
-limitation of the baseline approaches), which is expected and does not affect
 the membership/index computation timing reported here.
+# Literature baselines (GROTE=2, Blind=3, HERS=4) are CPU algorithms.
+# Only the server-side computation overhead is benchmarked; client-side
+# decryption may exceed CKKS approximation limits after computation completes.
+# run_campaign "GPU build (depth 10), approach 2 (GROTE), sizes 2^10..2^14" gpu \
+#   logn=[10,11,12,13,14] \
+#   kmatch=[1,1,1,1,1] \
+#   approaches_gpu=[2] \
+#   t=2 fixed_keys=true fresh_dataset=false comp_depth=10
 
-run_campaign "GPU build (depth 8), approach 2 (GROTE), sizes 2^10..2^14" gpu \
-  logn=[10,11,12,13,14] \
-  kmatch=[16,16,32,32,64] \
-  approaches_gpu=[2] \
-  t=2 fixed_keys=true fresh_dataset=false comp_depth=8
+# run_campaign "GPU current build (depth 10), approach 3 (Blind), sizes 2^10..2^14" current \
+#   logn=[10,11,12,13,14] \
+#   kmatch=[16,16,32,32,64] \
+#   approaches_gpu=[3] \
+#   t=2 fixed_keys=true fresh_dataset=false comp_depth=10
 
-run_campaign "GPU current build (depth 8), approach 3 (Blind), sizes 2^10..2^14" current \
-  logn=[10,11,12,13,14] \
-  kmatch=[16,16,32,32,64] \
-  approaches_gpu=[3] \
-  t=2 fixed_keys=true fresh_dataset=false comp_depth=8
-
-run_campaign "GPU current build (depth 8), approach 4 (HERS), sizes 2^10..2^14" current \
-  logn=[10,11,12,13,14] \
-  kmatch=[16,16,32,32,64] \
-  approaches_gpu=[4] \
-  t=2 fixed_keys=true fresh_dataset=false comp_depth=8
+# run_campaign "GPU current build (depth 10), approach 4 (HERS), sizes 2^10..2^14" current \
+#   logn=[10,11,12,13,14] \
+#   kmatch=[16,16,32,32,64] \
+#   approaches_gpu=[4] \
+#   t=2 fixed_keys=true fresh_dataset=false comp_depth=10
 
 run_campaign "CPU build (depth 10), approach 2 (GROTE), sizes 2^10..2^14" cpu \
   logn=[10,11,12,13,14] \
