@@ -191,6 +191,49 @@ If you want to run a GPU approach after a GPU build, for example:
 ./ImageMatching ../test/2_10.dat 51
 ```
 
+#### Scaling to larger databases with multiple GPUs
+
+A single GPU can keep the encrypted database "hot" up to roughly `2^16`
+vectors (for example, a 46 GiB Quadro RTX 8000). Approaches `81` (BSGS-GPU)
+and `812` (BSGS-GPU-PreRot) can scale beyond that limit by **sharding the
+database across several GPUs**. Each GPU holds a contiguous shard of the
+database, kept resident from the setup phase, and queries run in parallel
+(one CPU thread per GPU) with the partial results merged on the host. This
+keeps end-to-end latency sub-second while the database grows with the number
+of GPUs.
+
+Select the GPUs with the `--gpus` flag. The list is a comma- or space-separated
+set of CUDA device IDs. Multi-GPU sharding applies **only** to approaches `81`
+and `812`; all other approaches always use device `0`.
+
+Set `FIDESLIB_USE_GRAPH_CAPTURE=0` for multi-GPU runs. FIDESlib's CUDA graph
+capture cache is not stable across sharded GPU contexts yet, and disabling it
+avoids graph-update failures while keeping the GPU shards hot and parallel.
+
+```bash
+# 2^17 database split across 2 GPUs (2 × 2^16 shards)
+FIDESLIB_USE_GRAPH_CAPTURE=0 ./ImageMatching ../test/test_131072_k128.dat 81 --gpus 0,1
+
+# 2^18 database split across 4 GPUs (4 × 2^16 shards)
+FIDESLIB_USE_GRAPH_CAPTURE=0 ./ImageMatching ../test/test_262144_k128.dat 81 --gpus 0,1,2,3
+
+```
+
+Notes:
+
+- Use **distinct** device IDs (for example `--gpus 0,1`). Repeating an ID
+  such as `--gpus 0,0` does not create independent shards.
+- The database is split into balanced contiguous shards. The number of
+  shards equals the number of GPUs listed, so pick a device count that lets
+  each shard fit within a single GPU's memory (about `2^16` vectors per GPU).
+- Diagonals are sharded across GPUs while rotation/evaluation keys are
+  replicated on each GPU; the startup memory report prints the per-GPU split.
+- Query baby-step rotations use a `+1` rotation ladder by default to reduce
+  online query-to-GPU cache latency. Set `GPU_BABY_STEP_LADDER=0` to use the
+  direct per-offset rotation path for debugging or comparison.
+- Set `GPU_SHARD_SEQUENTIAL=1` to process shards one at a time instead of in
+  parallel (useful for debugging or memory-constrained runs).
+
 ### Automated Benchmark Script
 
 From the repository root, you can build and benchmark the project with:
@@ -241,6 +284,42 @@ Additional useful options:
 - `TEST_DATA_DIR=/path/to/test` overrides where generated datasets are stored.
 
 Benchmark CSV files are written under `benchmark_results/`.
+
+#### Benchmarking across multiple GPUs
+
+To benchmark larger databases that do not fit on a single GPU, set the
+`gpus` parameter when running `./test/benchmark.sh`. The
+benchmark harness forwards the parameter info to `ImageMatching`, which shards the
+database across the listed GPUs for approaches `81` and `812` (see
+[Scaling to larger databases with multiple GPUs](#scaling-to-larger-databases-with-multiple-gpus)).
+Use a comma-separated list of CUDA device IDs, set `FIDESLIB_USE_GRAPH_CAPTURE=0`,
+and restrict `approaches` to the multi-GPU-capable approaches:
+
+```bash
+# 2^17 database sharded across 2 GPUs (2 x 2^16 shards)
+FIDESLIB_USE_GRAPH_CAPTURE=0 ./test/benchmark.sh gpu logn=17 kmatch=128 approaches=[81,812] gpus=0,1
+
+# 2^18 database sharded across 4 GPUs (4 x 2^16 shards)
+FIDESLIB_USE_GRAPH_CAPTURE=0 ./test/benchmark.sh gpu logn=18 kmatch=128 approaches=[81,812] gpus=0,1,2,3
+```
+
+Notes:
+
+- Only approaches `81` and `812` shard across GPUs. Any other approach listed in
+  `approaches` still runs on device `0` only,
+  so keep the list restricted to `[81,812]` (or `[81]`) for a clean multi-GPU run.
+- Choose the GPU count so each shard fits on one GPU (about `2^16` vectors per
+  GPU): 2 GPUs for `logn=17`, 4 GPUs for `logn=18`, and so on.
+- Use distinct device IDs (`0,1`), not repeats such as `0,0`.
+- Keep `FIDESLIB_USE_GRAPH_CAPTURE=0` set for multi-GPU runs until FIDESlib's
+  CUDA graph cache is device/context-aware.
+- `Baby(s)` is the online encrypted-query upload and baby-step cache time.
+  `Member(s)` and `Index(s)` include `Baby(s)` so each scenario is reported as
+  a standalone online latency. Set `GPU_BABY_STEP_LADDER=0` to benchmark the
+  older direct baby-rotation path.
+- Set `GPU_SHARD_SEQUENTIAL=1` to process shards one at a time instead of in
+  parallel (useful for debugging or memory-constrained runs), for example
+  `FIDESLIB_USE_GRAPH_CAPTURE=0 GPU_SHARD_SEQUENTIAL=1 ./test/benchmark.sh gpu logn=17 kmatch=128 approaches=[81] gpus=0,1`.
 
 ### Accuracy Experiments
 
