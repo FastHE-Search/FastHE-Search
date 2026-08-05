@@ -80,13 +80,14 @@ run_and_filter() {
 run_campaign() {
   local label=$1
   shift
+  local outer_threads="${BENCHMARK_OUTER_THREADS:-40}"
 
   log ""
   log "------------------------------------------"
   log "$label"
   log "------------------------------------------"
 
-  run_and_filter env OUTER_THREADS=40 ./test/benchmark.sh "$@"
+  run_and_filter env OUTER_THREADS="$outer_threads" ./test/benchmark.sh "$@"
   BENCH_RC=$?
   if [ "$BENCH_RC" -ne 0 ]; then
     log "ERROR: $label failed with exit code $BENCH_RC"
@@ -157,7 +158,6 @@ log "Server-side membership/index overhead, sizes 2^10..2^14"
 log "Started at $(date)"
 log "=========================================="
 
-the membership/index computation timing reported here.
 # Literature baselines (GROTE=2, Blind=3, HERS=4) are CPU algorithms.
 # Only the server-side computation overhead is benchmarked; client-side
 # decryption may exceed CKKS approximation limits after computation completes.
@@ -179,19 +179,19 @@ the membership/index computation timing reported here.
 #   approaches_gpu=[4] \
 #   t=2 fixed_keys=true fresh_dataset=false comp_depth=10
 
-run_campaign "CPU build (depth 10), approach 2 (GROTE), sizes 2^10..2^14" cpu \
+BENCHMARK_OUTER_THREADS="${LITERATURE_OUTER_THREADS:-8}" run_campaign "CPU build (depth 10), approach 2 (GROTE), sizes 2^10..2^14" cpu \
   logn=[10,11,12,13,14] \
-  kmatch=[16,16,32,32,64] \
+  kmatch=[1,1,1,1,1] \
   approaches_cpu=[2] \
   t=2 fixed_keys=true fresh_dataset=false comp_depth=10
 
-run_campaign "CPU current build (depth 10), approach 3 (Blind), sizes 2^10..2^14" current \
+BENCHMARK_OUTER_THREADS="${LITERATURE_OUTER_THREADS:-8}" run_campaign "CPU current build (depth 10), approach 3 (Blind), sizes 2^10..2^14" current \
   logn=[10,11,12,13,14] \
   kmatch=[16,16,32,32,64] \
   approaches_cpu=[3] \
   t=2 fixed_keys=true fresh_dataset=false comp_depth=10
 
-run_campaign "CPU current build (depth 10), approach 4 (HERS), sizes 2^10..2^14" current \
+BENCHMARK_OUTER_THREADS="${LITERATURE_OUTER_THREADS:-8}" run_campaign "CPU current build (depth 10), approach 4 (HERS), sizes 2^10..2^14" current \
   logn=[10,11,12,13,14] \
   kmatch=[16,16,32,32,64] \
   approaches_cpu=[4] \

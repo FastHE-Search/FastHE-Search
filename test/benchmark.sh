@@ -353,6 +353,8 @@ run_benchmark() {
     local benchmark_flavor="$build_type"
     if [ "$build_type" = "cpu" ]; then
         benchmark_flavor="cpu-fideslib"
+    elif [ "$build_type" = "current" ] && grep -q '^USE_FIDESLIB_OPENFHE:BOOL=ON$' "$BUILD_DIR/CMakeCache.txt" 2>/dev/null; then
+        benchmark_flavor="cpu-fideslib"
     fi
     CLEAN_SERIAL="$clean_serial" KEEP_SERIAL="$keep_serial" REUSE_KEYS_ONLY="$reuse_keys_only" BENCHMARK_BUILD_FLAVOR="$benchmark_flavor" BUILD_DIR="$BUILD_DIR" TEST_DATA_DIR="$TEST_DATA_DIR" GPU_DEVICES="$GPU_DEVICES_OVERRIDE" python3 benchmark_all.py "$logn" "$kmatch" --output_file "$output_csv" --trial "$trial" $extra_args
 }
