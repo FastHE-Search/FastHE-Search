@@ -108,53 +108,53 @@ log "Part 1: Fixed keys+DB per approach and dataset"
 log "Started at $(date)"
 log "=========================================="
 
-run_campaign "GPU build (depth 8), approach 51, sizes 2^10..2^15" gpu \
-  logn=[10,11,12,13,14,15] \
-  kmatch=[16,16,32,32,64,64] \
-  approaches_gpu=[51] \
-  t=2 fixed_keys=true fresh_dataset=false comp_depth=8
+# run_campaign "GPU build (depth 8), approach 51, sizes 2^10..2^15" gpu \
+#   logn=[10,11,12,13,14,15] \
+#   kmatch=[16,16,32,32,64,64] \
+#   approaches_gpu=[51] \
+#   t=2 fixed_keys=true fresh_dataset=false comp_depth=8
 
-run_campaign "GPU current build (depth 8), approach 81, sizes 2^10..2^16" current \
-  logn=[10,11,12,13,14,15,16] \
-  kmatch=[16,16,32,32,64,64,128] \
-  approaches_gpu=[81] \
-  t=2 fixed_keys=true fresh_dataset=false comp_depth=8
+# run_campaign "GPU current build (depth 8), approach 81, sizes 2^10..2^16" current \
+#   logn=[10,11,12,13,14,15,16] \
+#   kmatch=[16,16,32,32,64,64,128] \
+#   approaches_gpu=[81] \
+#   t=2 fixed_keys=true fresh_dataset=false comp_depth=8
 
-run_campaign "GPU current build (depth 8), approach 812, sizes 2^10..2^16" current \
-  logn=[10,11,12,13,14,15,16] \
-  kmatch=[16,16,32,32,64,64,128] \
-  approaches_gpu=[812] \
-  t=2 fixed_keys=true fresh_dataset=false comp_depth=8
+# run_campaign "GPU current build (depth 8), approach 812, sizes 2^10..2^16" current \
+#   logn=[10,11,12,13,14,15,16] \
+#   kmatch=[16,16,32,32,64,64,128] \
+#   approaches_gpu=[812] \
+#   t=2 fixed_keys=true fresh_dataset=false comp_depth=8
 
-run_campaign "GPU current build (depth 8), approach 5, sizes 2^10..2^20" current \
-  logn=[10,11,12,13,14,15,16,17,18,19,20] \
-  kmatch=[16,16,32,32,64,64,128,128,256,256,512] \
-  approaches_gpu=[5] \
-  t=2 fixed_keys=true fresh_dataset=false comp_depth=8
+# run_campaign "GPU current build (depth 8), approach 5, sizes 2^10..2^20" current \
+#   logn=[10,11,12,13,14,15,16,17,18,19,20] \
+#   kmatch=[16,16,32,32,64,64,128,128,256,256,512] \
+#   approaches_gpu=[5] \
+#   t=2 fixed_keys=true fresh_dataset=false comp_depth=8
 
-run_campaign "GPU current build (depth 8), approach 8, sizes 2^10..2^20" gpu \
-  logn=[10,11,12,13,14,15,16,17,18,19,20] \
-  kmatch=[16,16,32,32,64,64,128,128,256,256,512] \
-  approaches_gpu=[8] \
-  t=2 fixed_keys=true fresh_dataset=false comp_depth=8
+# run_campaign "GPU current build (depth 8), approach 8, sizes 2^10..2^20" gpu \
+#   logn=[10,11,12,13,14,15,16,17,18,19,20] \
+#   kmatch=[16,16,32,32,64,64,128,128,256,256,512] \
+#   approaches_gpu=[8] \
+#   t=2 fixed_keys=true fresh_dataset=false comp_depth=8
 
 
-run_campaign "CPU build (depth 10), approach 5, sizes 2^10..2^20" cpu \
-  logn=[10,11,12,13,14,15,16,17,18,19,20] \
-  kmatch=[16,16,32,32,64,64,128,128,256,256,512] \
-  approaches_cpu=[5] \
-  t=2 fixed_keys=true fresh_dataset=false comp_depth=10
+# run_campaign "CPU build (depth 10), approach 5, sizes 2^10..2^20" cpu \
+#   logn=[10,11,12,13,14,15,16,17,18,19,20] \
+#   kmatch=[16,16,32,32,64,64,128,128,256,256,512] \
+#   approaches_cpu=[5] \
+#   t=2 fixed_keys=true fresh_dataset=false comp_depth=10
 
-run_campaign "CPU current build (depth 10), approach 8, sizes 2^10..2^20" current \
-  logn=[10,11,12,13,14,15,16,17,18,19,20] \
-  kmatch=[16,16,32,32,64,64,128,128,256,256,512] \
-  approaches_cpu=[8] \
-  t=2 fixed_keys=true fresh_dataset=false comp_depth=10
+# run_campaign "CPU current build (depth 10), approach 8, sizes 2^10..2^20" current \
+#   logn=[10,11,12,13,14,15,16,17,18,19,20] \
+#   kmatch=[16,16,32,32,64,64,128,128,256,256,512] \
+#   approaches_cpu=[8] \
+#   t=2 fixed_keys=true fresh_dataset=false comp_depth=10
 
 log ""
 log "=========================================="
 log "Part 2: Literature baseline approaches (GROTE, Blind, HERS)"
-log "Server-side membership/index overhead, sizes 2^10..2^14"
+log "Server-side membership/index overhead, sizes 2^10..2^16"
 log "Started at $(date)"
 log "=========================================="
 
@@ -179,21 +179,21 @@ log "=========================================="
 #   approaches_gpu=[4] \
 #   t=2 fixed_keys=true fresh_dataset=false comp_depth=10
 
-BENCHMARK_OUTER_THREADS="${LITERATURE_OUTER_THREADS:-8}" run_campaign "CPU build (depth 10), approach 2 (GROTE), sizes 2^10..2^14" cpu \
-  logn=[10,11,12,13,14] \
-  kmatch=[1,1,1,1,1] \
+BENCHMARK_OUTER_THREADS="${LITERATURE_OUTER_THREADS:-8}" run_campaign "CPU build (depth 10), approach 2 (GROTE), sizes 2^10..2^16" cpu \
+  logn=[10,11,12,13,14,15,16] \
+  kmatch=[1,1,1,1,1,1,1] \
   approaches_cpu=[2] \
   t=2 fixed_keys=true fresh_dataset=false comp_depth=10
 
-BENCHMARK_OUTER_THREADS="${LITERATURE_OUTER_THREADS:-8}" run_campaign "CPU current build (depth 10), approach 3 (Blind), sizes 2^10..2^14" current \
-  logn=[10,11,12,13,14] \
-  kmatch=[16,16,32,32,64] \
+BENCHMARK_OUTER_THREADS="${LITERATURE_OUTER_THREADS:-8}" run_campaign "CPU current build (depth 10), approach 3 (Blind), sizes 2^10..2^16" current \
+  logn=[10,11,12,13,14,15,16] \
+  kmatch=[16,16,32,32,64,64,128] \
   approaches_cpu=[3] \
   t=2 fixed_keys=true fresh_dataset=false comp_depth=10
 
-BENCHMARK_OUTER_THREADS="${LITERATURE_OUTER_THREADS:-8}" run_campaign "CPU current build (depth 10), approach 4 (HERS), sizes 2^10..2^14" current \
-  logn=[10,11,12,13,14] \
-  kmatch=[16,16,32,32,64] \
+BENCHMARK_OUTER_THREADS="${LITERATURE_OUTER_THREADS:-8}" run_campaign "CPU current build (depth 10), approach 4 (HERS), sizes 2^10..2^16" current \
+  logn=[10,11,12,13,14,15,16] \
+  kmatch=[16,16,32,32,64,64,128] \
   approaches_cpu=[4] \
   t=2 fixed_keys=true fresh_dataset=false comp_depth=10
 
