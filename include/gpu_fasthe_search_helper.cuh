@@ -10,8 +10,8 @@
 //
 //  SPDX-License-Identifier: MIT
 
-#ifndef GPU_HYDIA_HELPER_CUH
-#define GPU_HYDIA_HELPER_CUH
+#ifndef GPU_FASTHE_SEARCH_HELPER_CUH
+#define GPU_FASTHE_SEARCH_HELPER_CUH
 
 #include <map>
 #include <memory>
@@ -31,7 +31,7 @@ using namespace lbcrypto;
 constexpr double GPU_MEMORY_SAFE_FRACTION = 0.95;
 
 /**
- * GPU Hydia Helper — Approaches 51 (Pure Diagonal) and 81 (BSGS)
+ * GPU FastHE-Search Helper — Approaches 51 (Pure Diagonal) and 81 (BSGS)
  *
  * Provides GPU-accelerated CKKS operations with:
  *   - Wave-based multi-stream parallelism across CKKS batches
@@ -53,11 +53,11 @@ constexpr double GPU_MEMORY_SAFE_FRACTION = 0.95;
  *   Same as 81 but with vectorDim baby steps, no giant-step decomposition,
  *   and a dedicated pure-diagonal code path for efficiency.
  */
-class GPUHydiaHelper {
+class GPUFastHESearchHelper {
   public:
-	GPUHydiaHelper(CryptoContext<DCRTPoly> cc, const KeyPair<DCRTPoly>& keys, const std::vector<int>& gpuDevices = { 0 }, int batchSize = 8, double gpuSafeMemoryLimitGB = -1.0);
+	GPUFastHESearchHelper(CryptoContext<DCRTPoly> cc, const KeyPair<DCRTPoly>& keys, const std::vector<int>& gpuDevices = { 0 }, int batchSize = 8, double gpuSafeMemoryLimitGB = -1.0);
 
-	~GPUHydiaHelper();
+	~GPUFastHESearchHelper();
 
 	// =========================================================================
 	// Diagonal caching
@@ -233,7 +233,7 @@ class GPUHydiaHelper {
 	// maps to a distinct GPU.
 	bool isCoordinator_ = false;
 	std::vector<int> shardDevices_;
-	std::vector<std::unique_ptr<GPUHydiaHelper>> shardHelpers_;
+	std::vector<std::unique_ptr<GPUFastHESearchHelper>> shardHelpers_;
 
 	// Balanced contiguous matrix ranges [start, end) for numShards shards.
 	std::vector<std::pair<size_t, size_t>> ComputeShardRanges(size_t numMatrices, size_t numShards) const;
@@ -286,4 +286,4 @@ class GPUHydiaHelper {
 #endif
 };
 
-#endif // GPU_HYDIA_HELPER_CUH
+#endif // GPU_FASTHE_SEARCH_HELPER_CUH

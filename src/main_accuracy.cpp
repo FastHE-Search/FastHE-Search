@@ -95,7 +95,7 @@ static bool serializedDataExists(ExperimentalApproach approach, size_t numVector
 	size_t numMatrices = (numVectors + batchSizeHint - 1) / batchSizeHint;
 
 	switch (approach) {
-	case ExperimentalApproach::HydiaCPU:
+	case ExperimentalApproach::FastHESearchCPU:
 	case ExperimentalApproach::BSGSOrigCPU:
 	case ExperimentalApproach::BSGSPrecompCPU:
 	case ExperimentalApproach::BSGSPrecompOptCPU:
@@ -132,7 +132,7 @@ static bool serializedDataExists(ExperimentalApproach approach, size_t numVector
 
 // Check if approach is a GPU approach
 static bool isGPUApproach(ExperimentalApproach approach) {
-	return approach == ExperimentalApproach::HyDiaGPU || approach == ExperimentalApproach::BSGSGPU || approach == ExperimentalApproach::BSGSGPUPreRot;
+	return approach == ExperimentalApproach::FastHESearchGPU || approach == ExperimentalApproach::BSGSGPU || approach == ExperimentalApproach::BSGSGPUPreRot;
 }
 
 // Check if approach is unsupported for accuracy testing
@@ -150,7 +150,7 @@ static size_t computeDepthWithOverride(ExperimentalApproach approach, size_t com
 	case ExperimentalApproach::Grote: depth = 1 + 2 + ALPHA_DEPTH + 3 + compDepth; break;
 	case ExperimentalApproach::BlindMatch: depth = 1 + 1 + compDepth; break;
 	case ExperimentalApproach::Hers:
-	case ExperimentalApproach::HydiaCPU:
+	case ExperimentalApproach::FastHESearchCPU:
 	case ExperimentalApproach::BSGSOrigCPU:
 	case ExperimentalApproach::BSGSPrecompCPU:
 	case ExperimentalApproach::BSGSPrecompOptCPU: depth = 1 + compDepth; break;
@@ -195,7 +195,7 @@ int main(int argc, char* argv[]) {
 		cerr << "    2 = GROTE" << endl;
 		cerr << "    3 = Blind-Match" << endl;
 		cerr << "    4 = HERS" << endl;
-		cerr << "    5 = HyDia diagonal (CPU)" << endl;
+		cerr << "    5 = FastHE-Search diagonal (CPU)" << endl;
 		cerr << "    6 = BSGS-Orig (CPU)" << endl;
 		cerr << "    7 = BSGS-Precomp (CPU)" << endl;
 		cerr << "    8 = BSGS-Precomp-Opt (CPU)" << endl;
@@ -484,7 +484,7 @@ int main(int argc, char* argv[]) {
 		} else if (expApproach == ExperimentalApproach::Hers) {
 			enroller = new HersEnroller(cc, pk, numVectors);
 			static_cast<HersEnroller*>(enroller)->serializeDB(plaintextVectors);
-		} else if (expApproach == ExperimentalApproach::HydiaCPU) {
+		} else if (expApproach == ExperimentalApproach::FastHESearchCPU) {
 			enroller = new DiagonalEnroller(cc, pk, numVectors);
 			static_cast<DiagonalEnroller*>(enroller)->serializeDB(plaintextVectors);
 		} else if (expApproach == ExperimentalApproach::BSGSOrigCPU) {
@@ -572,7 +572,7 @@ int main(int argc, char* argv[]) {
 		sender	 = new HersSender(cc, pk, numVectors);
 		break;
 
-	case ExperimentalApproach::HydiaCPU:
+	case ExperimentalApproach::FastHESearchCPU:
 		receiver = new DiagonalReceiver(cc, pk, sk, numVectors);
 		sender	 = new DiagonalSender(cc, pk, numVectors);
 		break;

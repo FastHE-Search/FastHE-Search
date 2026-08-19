@@ -17,7 +17,7 @@
 // from DiagonalBSGSSimpleSenderGPU (Approach 81) and is unchanged.
 
 #include "../../include/sender_diag_bsgs_simple_gpu_prerot.h"
-#include "../../include/gpu_hydia_helper.cuh"
+#include "../../include/gpu_fasthe_search_helper.cuh"
 #include <chrono>
 #include <cmath>
 #include <iomanip>
@@ -27,7 +27,7 @@ using namespace std;
 
 // -------------------- CONSTRUCTOR --------------------
 
-DiagonalBSGSSimpleSenderGPU812::DiagonalBSGSSimpleSenderGPU812(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam, GPUHydiaHelper* gpuHelper)
+DiagonalBSGSSimpleSenderGPU812::DiagonalBSGSSimpleSenderGPU812(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam, GPUFastHESearchHelper* gpuHelper)
 : DiagonalBSGSSimpleSenderGPU(ccParam, pkParam, vectorParam, gpuHelper) {
 	if (gpuHelper_ && gpuHelper_->isReady()) {
 		cout << "[Approach 812] GPU BSGS Sender (enroller pre-rotation) initialized:" << endl;

@@ -13,7 +13,7 @@
 #  SPDX-License-Identifier: MIT
 
 """
-Generate comparison plots: BSGS_CPU vs HyDia_CPU
+Generate comparison plots: BSGS_CPU vs FastHE-Search_CPU
 Based on aggregated benchmark data.
 """
 
@@ -79,7 +79,7 @@ data = {
         ],
         "peak_disk_gb": [6.1, 6.1, 6.1, 6.1, 6.1, 9.1, 15.1, 27.1, 51.1, 99.2, 195.2],
     },
-    "HyDia_CPU": {
+    "FastHE-Search_CPU": {
         "dataset_size": [
             1024,
             2048,
@@ -154,15 +154,15 @@ log2_sizes = [int(np.log2(s)) for s in dataset_sizes]
 
 # Create figure with 4 subplots (2x2)
 fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-fig.suptitle("BSGS_CPU vs HyDia_CPU Comparison", fontsize=14, fontweight="bold")
+fig.suptitle("BSGS_CPU vs FastHE-Search_CPU Comparison", fontsize=14, fontweight="bold")
 
 # Colors for the approaches
-colors = {"BSGS_CPU": "#2196F3", "HyDia_CPU": "#FF5722"}  # Blue  # Orange
-markers = {"BSGS_CPU": "o", "HyDia_CPU": "s"}
+colors = {"BSGS_CPU": "#2196F3", "FastHE-Search_CPU": "#FF5722"}  # Blue  # Orange
+markers = {"BSGS_CPU": "o", "FastHE-Search_CPU": "s"}
 
 # Plot 1: Membership Time vs Dataset Size
 ax1 = axes[0, 0]
-for approach in ["BSGS_CPU", "HyDia_CPU"]:
+for approach in ["BSGS_CPU", "FastHE-Search_CPU"]:
     y_data = data[approach]["membership_time"]
     ax1.plot(
         log2_sizes,
@@ -174,7 +174,7 @@ for approach in ["BSGS_CPU", "HyDia_CPU"]:
         label=approach,
     )
     # Add data labels
-    offset = 5 if approach == "HyDia_CPU" else -12
+    offset = 5 if approach == "FastHE-Search_CPU" else -12
     for x, y in zip(log2_sizes, y_data):
         ax1.annotate(
             f"{int(round(y))}",
@@ -187,7 +187,7 @@ for approach in ["BSGS_CPU", "HyDia_CPU"]:
         )
 # Add arrow at max difference
 y1 = np.array(data["BSGS_CPU"]["membership_time"])
-y2 = np.array(data["HyDia_CPU"]["membership_time"])
+y2 = np.array(data["FastHE-Search_CPU"]["membership_time"])
 diffs = np.abs(y1 - y2)
 max_idx = np.argmax(diffs)
 x_max = log2_sizes[max_idx]
@@ -216,7 +216,7 @@ ax1.set_xticklabels([f"2^{{{x}}}" for x in log2_sizes], fontsize=9)
 
 # Plot 2: Index Time vs Dataset Size
 ax2 = axes[0, 1]
-for approach in ["BSGS_CPU", "HyDia_CPU"]:
+for approach in ["BSGS_CPU", "FastHE-Search_CPU"]:
     y_data = data[approach]["index_time"]
     ax2.plot(
         log2_sizes,
@@ -228,7 +228,7 @@ for approach in ["BSGS_CPU", "HyDia_CPU"]:
         label=approach,
     )
     # Add data labels
-    offset = 5 if approach == "HyDia_CPU" else -12
+    offset = 5 if approach == "FastHE-Search_CPU" else -12
     for x, y in zip(log2_sizes, y_data):
         ax2.annotate(
             f"{int(round(y))}",
@@ -241,7 +241,7 @@ for approach in ["BSGS_CPU", "HyDia_CPU"]:
         )
 # Add arrow at max difference
 y1 = np.array(data["BSGS_CPU"]["index_time"])
-y2 = np.array(data["HyDia_CPU"]["index_time"])
+y2 = np.array(data["FastHE-Search_CPU"]["index_time"])
 diffs = np.abs(y1 - y2)
 max_idx = np.argmax(diffs)
 x_max = log2_sizes[max_idx]
@@ -270,7 +270,7 @@ ax2.set_xticklabels([f"2^{{{x}}}" for x in log2_sizes], fontsize=9)
 
 # Plot 3: Peak RAM vs Dataset Size
 ax3 = axes[1, 0]
-for approach in ["BSGS_CPU", "HyDia_CPU"]:
+for approach in ["BSGS_CPU", "FastHE-Search_CPU"]:
     y_data = data[approach]["peak_ram_gb"]
     ax3.plot(
         log2_sizes,
@@ -282,7 +282,7 @@ for approach in ["BSGS_CPU", "HyDia_CPU"]:
         label=approach,
     )
     # Add data labels
-    offset = 5 if approach == "HyDia_CPU" else -12
+    offset = 5 if approach == "FastHE-Search_CPU" else -12
     for x, y in zip(log2_sizes, y_data):
         ax3.annotate(
             f"{int(round(y))}",
@@ -295,7 +295,7 @@ for approach in ["BSGS_CPU", "HyDia_CPU"]:
         )
 # Add arrow at max difference
 y1 = np.array(data["BSGS_CPU"]["peak_ram_gb"])
-y2 = np.array(data["HyDia_CPU"]["peak_ram_gb"])
+y2 = np.array(data["FastHE-Search_CPU"]["peak_ram_gb"])
 diffs = np.abs(y1 - y2)
 max_idx = np.argmax(diffs)
 x_max = log2_sizes[max_idx]
@@ -324,7 +324,7 @@ ax3.set_xticklabels([f"2^{{{x}}}" for x in log2_sizes], fontsize=9)
 
 # Plot 4: Peak Disk vs Dataset Size
 ax4 = axes[1, 1]
-for approach in ["BSGS_CPU", "HyDia_CPU"]:
+for approach in ["BSGS_CPU", "FastHE-Search_CPU"]:
     y_data = data[approach]["peak_disk_gb"]
     ax4.plot(
         log2_sizes,
@@ -336,7 +336,7 @@ for approach in ["BSGS_CPU", "HyDia_CPU"]:
         label=approach,
     )
     # Add data labels
-    offset = 5 if approach == "HyDia_CPU" else -12
+    offset = 5 if approach == "FastHE-Search_CPU" else -12
     for x, y in zip(log2_sizes, y_data):
         ax4.annotate(
             f"{int(round(y))}",
@@ -349,7 +349,7 @@ for approach in ["BSGS_CPU", "HyDia_CPU"]:
         )
 # Add arrow at max difference
 y1 = np.array(data["BSGS_CPU"]["peak_disk_gb"])
-y2 = np.array(data["HyDia_CPU"]["peak_disk_gb"])
+y2 = np.array(data["FastHE-Search_CPU"]["peak_disk_gb"])
 diffs = np.abs(y1 - y2)
 max_idx = np.argmax(diffs)
 x_max = log2_sizes[max_idx]
@@ -381,13 +381,13 @@ plt.tight_layout()
 
 # Save figure
 output_path = (
-    "/space/gpereira/image_matching/tools/figures/bsgs_vs_hydia_comparison.png"
+    "/space/gpereira/image_matching/tools/figures/bsgs_vs_fasthe_search_comparison.png"
 )
 plt.savefig(output_path, dpi=150, bbox_inches="tight")
 print(f"✅ Figure saved to: {output_path}")
 
 # Also save as PDF for publication quality
-pdf_path = "/space/gpereira/image_matching/tools/figures/bsgs_vs_hydia_comparison.pdf"
+pdf_path = "/space/gpereira/image_matching/tools/figures/bsgs_vs_fasthe_search_comparison.pdf"
 plt.savefig(pdf_path, bbox_inches="tight")
 print(f"✅ PDF saved to: {pdf_path}")
 

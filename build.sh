@@ -12,7 +12,7 @@
 #
 #  SPDX-License-Identifier: MIT
 
-# HyDia Build Script - Choose CPU or GPU mode
+# FastHE-Search Build Script - Choose CPU or GPU mode
 # This script makes it easy to switch between OpenFHE versions
 
 set -e  # Exit on error
@@ -36,7 +36,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 show_help() {
-    echo "HyDia Build Script"
+    echo "FastHE-Search Build Script"
     echo ""
     echo "Usage: $0 [cpu|gpu|clean|clean-all|help]"
     echo ""
@@ -58,7 +58,7 @@ show_help() {
     echo "  FIDESLIB_ARCHIVE_URL=https://host/fideslib.tar.gz $0 gpu"
     echo ""
     echo "Environment overrides:"
-    echo "  BUILD_DIR               Custom HyDia build directory"
+    echo "  BUILD_DIR               Custom FastHE-Search build directory"
     echo "  FIDESLIB_DIR            Use an existing FIDESlib checkout"
     echo "  FIDESLIB_GIT_URL        Clone FIDESlib automatically when missing"
     echo "  FIDESLIB_ARCHIVE_URL    Download and extract a FIDESlib source archive"
@@ -257,7 +257,7 @@ build_fideslib() {
 
 build_cpu() {
     echo -e "${BLUE}========================================${NC}"
-    echo -e "${BLUE}Building HyDia for CPU (OpenFHE 1.3.0)${NC}"
+    echo -e "${BLUE}Building FastHE-Search for CPU (OpenFHE 1.3.0)${NC}"
     echo -e "${BLUE}========================================${NC}"
 
     require_command cmake
@@ -285,12 +285,12 @@ build_cpu() {
     echo -e "${GREEN}OpenFHE Version: 1.3.0 (system)${NC}"
     echo -e "${GREEN}Supported approaches: 1-8, 11${NC}"
     echo ""
-    echo "Run with: ./run_hydia.sh test/test_1024_k10.dat 6 11 45"
+    echo "Run with: ./run_fasthe_search.sh test/test_1024_k10.dat 6 11 45"
 }
 
 build_gpu() {
     echo -e "${BLUE}========================================${NC}"
-    echo -e "${BLUE}Building HyDia for GPU (OpenFHE 1.4.2)${NC}"
+    echo -e "${BLUE}Building FastHE-Search for GPU (OpenFHE 1.4.2)${NC}"
     echo -e "${BLUE}========================================${NC}"
 
     preflight_gpu_build
@@ -358,9 +358,9 @@ build_gpu() {
 
     echo -e "${GREEN}✓ GPU build complete!${NC}"
     echo -e "${GREEN}OpenFHE Version: 1.4.2 (FIDESlib-patched, -O3 -march=native)${NC}"
-    echo -e "${GREEN}Supported approaches: 1-11, 51, 81 (51 HyDia-GPU, 81 BSGS-GPU, 812 BSGS-GPU-PreRot)${NC}"
+    echo -e "${GREEN}Supported approaches: 1-11, 51, 81 (51 FastHE-Search-GPU, 81 BSGS-GPU, 812 BSGS-GPU-PreRot)${NC}"
     echo ""
-    echo "Run with: ./run_hydia.sh test/test_1024_k10.dat 9 11 45"
+    echo "Run with: ./run_fasthe_search.sh test/test_1024_k10.dat 9 11 45"
 }
 
 # Main script logic

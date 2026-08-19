@@ -45,7 +45,7 @@ run_and_filter() {
       fflush(verbose_log)
 
       is_cpp = 0
-      if (index(clean, "[HyDia]") > 0) is_cpp = 1
+      if (index(clean, "[FastHE-Search]") > 0) is_cpp = 1
       else if (index(clean, "[GPU") > 0) is_cpp = 1
       else if (index(clean, "[Sender]") > 0) is_cpp = 1
       else if (index(clean, "[Receiver]") > 0) is_cpp = 1
@@ -53,7 +53,7 @@ run_and_filter() {
       else if (index(clean, "[Approach") > 0) is_cpp = 1
       else if (index(clean, "[BSGS") > 0) is_cpp = 1
       else if (index(clean, "[CUDA Streams]") > 0) is_cpp = 1
-      else if (index(clean, "[GPUHydiaHelper]") > 0) is_cpp = 1
+      else if (index(clean, "[GPUFastHESearchHelper]") > 0) is_cpp = 1
       else if (clean ~ /\[[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/) is_cpp = 1
       else if (index(clean, "MembComp=") > 0) is_cpp = 1
       else if (index(clean, "IdxComp=") > 0) is_cpp = 1
