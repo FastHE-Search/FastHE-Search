@@ -10,7 +10,7 @@
 //
 //  SPDX-License-Identifier: MIT
 /**
- * GPU Debug Profiler for HyDia Approaches 9 and 10
+ * GPU Debug Profiler for FastHE-Search Approaches 9 and 10
  *
  * This header provides comprehensive debugging and profiling utilities for
  * GPU-accelerated operations. It tracks:
@@ -23,7 +23,7 @@
  *   Set GPU_DEBUG_PROFILER_ENABLED to 1 to enable debugging
  *   Set GPU_DEBUG_PROFILER_ENABLED to 0 to disable (zero overhead)
  *
- * Author: GPU HyDia Team
+ * Author: GPU FastHE-Search Team
  * Date: January 2026
  */
 

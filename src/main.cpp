@@ -82,7 +82,7 @@ size_t MAX_NUM_CORES;
 
 // GPU acceleration headers
 #ifdef USE_GPU_ACCELERATION
-#include "../include/gpu_hydia_helper.cuh"
+#include "../include/gpu_fasthe_search_helper.cuh"
 #endif
 
 // Header files needed for serialization
@@ -264,8 +264,8 @@ bool serializedDataExists(ExperimentalApproach approach, size_t numVectors, size
 	// Check database files based on approach
 	size_t numMatrices = (numVectors + batchSizeHint - 1) / batchSizeHint;
 
-	if (approach == ExperimentalApproach::HydiaCPU || approach == ExperimentalApproach::BSGSOrigCPU || approach == ExperimentalApproach::BSGSPrecompCPU ||
-	  approach == ExperimentalApproach::BSGSPrecompOptCPU || approach == ExperimentalApproach::BSGSOnlineAggCPU || approach == ExperimentalApproach::HyDiaGPU ||
+	if (approach == ExperimentalApproach::FastHESearchCPU || approach == ExperimentalApproach::BSGSOrigCPU || approach == ExperimentalApproach::BSGSPrecompCPU ||
+	  approach == ExperimentalApproach::BSGSPrecompOptCPU || approach == ExperimentalApproach::BSGSOnlineAggCPU || approach == ExperimentalApproach::FastHESearchGPU ||
 	  approach == ExperimentalApproach::BSGSGPU || approach == ExperimentalApproach::BSGSGPUPreRot) {
 		// Diagonal approaches: check db_diagonal folder
 		// Check first and last file as a quick validation
@@ -352,7 +352,7 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 	if (approachMeta == nullptr) {
-		cerr << "Error: approach must be from 1 to 9, or 51 (HyDia-GPU), 81 "
+		cerr << "Error: approach must be from 1 to 9, or 51 (FastHE-Search-GPU), 81 "
 				"(BSGS-GPU), or 812 (BSGS-GPU-PreRot)"
 			 << endl;
 		return 1;
@@ -452,7 +452,7 @@ int main(int argc, char* argv[]) {
 
 // GPU helper pointer (used for GPU approaches)
 #ifdef USE_GPU_ACCELERATION
-	GPUHydiaHelper* gpuHelper __attribute__((unused)) = nullptr;
+	GPUFastHESearchHelper* gpuHelper __attribute__((unused)) = nullptr;
 #endif
 
 	// Auto-detect whether to load serialized keys and/or serialized database
@@ -634,7 +634,7 @@ int main(int argc, char* argv[]) {
 			// chebyshevCompare performs no rotations.
 
 			cout << "BSGS mode: generating " << rotationFactors.size() << " rotation keys (vs " << (VECTOR_DIM - 1) << " in standard mode)" << endl;
-		} else if (expApproach == ExperimentalApproach::HyDiaGPU) {
+		} else if (expApproach == ExperimentalApproach::FastHESearchGPU) {
 			// Approach 51 (GPU Pure Diagonal): same as standard but NO negative
 			// binary keys. GPU pipeline never uses negative rotations (no giant-step
 			// pre-rotation when n1=VECTOR_DIM).
@@ -648,7 +648,7 @@ int main(int argc, char* argv[]) {
 
 			// NOTE: negative binary keys omitted — GPU EvalSum uses positive shifts
 			// only, and there's no BSGS pre-rotation for pure diagonal mode.
-			cout << "Approach 51 HyDia-GPU mode: generating " << rotationFactors.size() << " rotation keys (diag 1-" << (VECTOR_DIM - 1) << " + binary "
+			cout << "Approach 51 FastHE-Search-GPU mode: generating " << rotationFactors.size() << " rotation keys (diag 1-" << (VECTOR_DIM - 1) << " + binary "
 				 << VECTOR_DIM << "-" << (batchSize / 2) << ", no negative keys)" << endl;
 		} else {
 			// Standard mode (CPU approaches): all rotation keys from 1 to VECTOR_DIM
@@ -725,7 +725,7 @@ int main(int argc, char* argv[]) {
 		} else if (expApproach == ExperimentalApproach::Hers) {
 			enroller = new HersEnroller(cc, pk, numVectors);
 			static_cast<HersEnroller*>(enroller)->serializeDB(plaintextVectors);
-		} else if (expApproach == ExperimentalApproach::HydiaCPU) {
+		} else if (expApproach == ExperimentalApproach::FastHESearchCPU) {
 			enroller = new DiagonalEnroller(cc, pk, numVectors);
 			static_cast<DiagonalEnroller*>(enroller)->serializeDB(plaintextVectors);
 		} else if (expApproach == ExperimentalApproach::BSGSOrigCPU) {
@@ -740,7 +740,7 @@ int main(int argc, char* argv[]) {
 		} else if (expApproach == ExperimentalApproach::BSGSOnlineAggCPU) {
 			enroller = new DiagonalBSGSPrecompOptEnroller(cc, pk, numVectors);
 			static_cast<DiagonalBSGSPrecompOptEnroller*>(enroller)->serializeDB(plaintextVectors);
-		} else if (expApproach == ExperimentalApproach::HyDiaGPU) {
+		} else if (expApproach == ExperimentalApproach::FastHESearchGPU) {
 			// Approach 51 uses the same serialized diagonal format as approach 5
 			enroller = new DiagonalEnroller(cc, pk, numVectors);
 			static_cast<DiagonalEnroller*>(enroller)->serializeDB(plaintextVectors);
@@ -839,7 +839,7 @@ int main(int argc, char* argv[]) {
 		sender	 = new HersSender(cc, pk, numVectors);
 		break;
 
-	case ExperimentalApproach::HydiaCPU:
+	case ExperimentalApproach::FastHESearchCPU:
 		receiver = new DiagonalReceiver(cc, pk, sk, numVectors);
 		sender	 = new DiagonalSender(cc, pk, numVectors);
 		break;
@@ -864,9 +864,9 @@ int main(int argc, char* argv[]) {
 		sender	 = new DiagonalBSGSPrecompMemberAggrCtSender(cc, pk, numVectors);
 		break;
 
-	case ExperimentalApproach::HyDiaGPU: {
+	case ExperimentalApproach::FastHESearchGPU: {
 #ifdef USE_GPU_ACCELERATION
-		cout << "[HyDia-GPU] Initializing GPU diagonal sender..." << endl;
+		cout << "[FastHE-Search-GPU] Initializing GPU diagonal sender..." << endl;
 
 		std::vector<double> dummy_vec(1, 1.0);
 		auto dummy_pt = cc->MakeCKKSPackedPlaintext(dummy_vec);
@@ -877,12 +877,12 @@ int main(int argc, char* argv[]) {
 		keys.secretKey		   = sk;
 		vector<int> gpuDevices = gpuDeviceList;
 		auto gpuInitStart	   = chrono::steady_clock::now();
-		gpuHelper			   = new GPUHydiaHelper(cc, keys, gpuDevices, batchSize);
+		gpuHelper			   = new GPUFastHESearchHelper(cc, keys, gpuDevices, batchSize);
 		auto gpuInitEnd		   = chrono::steady_clock::now();
 		gpuKeyUploadTime += chrono::duration<double>(gpuInitEnd - gpuInitStart).count();
 
 		if (!gpuHelper->isReady()) {
-			cerr << "[HyDia-GPU] GPU initialization failed, falling back to CPU "
+			cerr << "[FastHE-Search-GPU] GPU initialization failed, falling back to CPU "
 					"Diagonal approach"
 				 << endl;
 			delete gpuHelper;
@@ -912,7 +912,7 @@ int main(int argc, char* argv[]) {
 			double diagMemPerGpuGB = diagMemGB / static_cast<double>(numGpusShard);
 			double totalMemGB	   = diagMemPerGpuGB + keyMemGB;
 
-			cout << "\n[HyDia-GPU] Memory estimation:" << endl;
+			cout << "\n[FastHE-Search-GPU] Memory estimation:" << endl;
 			cout << "  Diagonals:      " << numDiagonals << " x ~15MB = " << fixed << setprecision(2) << diagMemGB << " GB" << endl;
 			cout << "  Rotation keys:  " << numRotationKeys << " x ~45MB = " << fixed << setprecision(2) << keyMemGB << " GB"
 				 << " (DiagRot=" << (VECTOR_DIM - 1) << ", EvalSum=" << evalSumKeyCount << ")" << endl;
@@ -921,9 +921,9 @@ int main(int argc, char* argv[]) {
 				 << (GPU_MEMORY_SAFE_LIMIT_GB / GPU_TOTAL_MEMORY_GB * 100) << "% of " << GPU_TOTAL_MEMORY_GB << "GB)" << endl;
 
 			if (totalMemGB > GPU_MEMORY_SAFE_LIMIT_GB) {
-				cerr << "\n[HyDia-GPU] FATAL: Insufficient GPU memory for this dataset." << endl;
-				cerr << "[HyDia-GPU] Need " << fixed << setprecision(1) << totalMemGB << " GB but only " << GPU_MEMORY_SAFE_LIMIT_GB << " GB safely available." << endl;
-				cerr << "[HyDia-GPU] Options:" << endl;
+				cerr << "\n[FastHE-Search-GPU] FATAL: Insufficient GPU memory for this dataset." << endl;
+				cerr << "[FastHE-Search-GPU] Need " << fixed << setprecision(1) << totalMemGB << " GB but only " << GPU_MEMORY_SAFE_LIMIT_GB << " GB safely available." << endl;
+				cerr << "[FastHE-Search-GPU] Options:" << endl;
 				cerr << "  1. Use a smaller dataset" << endl;
 				cerr << "  2. Use CPU-only approach 5" << endl;
 				delete gpuHelper;
@@ -943,13 +943,13 @@ int main(int argc, char* argv[]) {
 			bool useBulkMode		   = (streamDiagsEnv && std::string(streamDiagsEnv) == "0");
 
 			if (!useBulkMode) {
-				cout << "[HyDia-GPU] Streaming diagonals disk→GPU (default mode)" << endl;
+				cout << "[FastHE-Search-GPU] Streaming diagonals disk→GPU (default mode)" << endl;
 				auto cacheStart = chrono::steady_clock::now();
 				gpuSender->streamDiagonalsFromDisk("serial");
 				auto cacheEnd = chrono::steady_clock::now();
 				gpuDBCacheTime += chrono::duration<double>(cacheEnd - cacheStart).count();
 			} else {
-				cout << "[HyDia-GPU] Loading diagonals to GPU (bulk mode, "
+				cout << "[FastHE-Search-GPU] Loading diagonals to GPU (bulk mode, "
 						"GPU_STREAM_DIAGS=0)..."
 					 << endl;
 				auto cacheStart = chrono::steady_clock::now();
@@ -965,13 +965,13 @@ int main(int argc, char* argv[]) {
 					if (Serial::DeserializeFromFile(filepath, diagonal, SerType::BINARY)) {
 						preloadedDiagonals[i] = diagonal;
 					} else {
-						cerr << "[HyDia-GPU] Error loading diagonal " << i << endl;
+						cerr << "[FastHE-Search-GPU] Error loading diagonal " << i << endl;
 					}
 				}
 
 				auto loadEnd	= chrono::steady_clock::now();
 				double loadTime = chrono::duration<double>(loadEnd - loadStart).count();
-				cout << "[HyDia-GPU] Loaded " << numDiagonals << " diagonals in " << loadTime << "s" << endl;
+				cout << "[FastHE-Search-GPU] Loaded " << numDiagonals << " diagonals in " << loadTime << "s" << endl;
 
 				gpuSender->initializeGPUCache(preloadedDiagonals);
 					auto cacheEnd = chrono::steady_clock::now();
@@ -979,7 +979,7 @@ int main(int argc, char* argv[]) {
 			}
 		}
 #else
-		cout << "[HyDia-GPU] GPU support not compiled. Falling back to CPU "
+		cout << "[FastHE-Search-GPU] GPU support not compiled. Falling back to CPU "
 				"Diagonal approach."
 			 << endl;
 		receiver = new DiagonalReceiver(cc, pk, sk, numVectors);
@@ -999,7 +999,7 @@ int main(int argc, char* argv[]) {
 		keys.secretKey		   = sk;
 		vector<int> gpuDevices = gpuDeviceList;
 		auto gpuInitStart	   = chrono::steady_clock::now();
-		gpuHelper			   = new GPUHydiaHelper(cc, keys, gpuDevices, batchSize);
+		gpuHelper			   = new GPUFastHESearchHelper(cc, keys, gpuDevices, batchSize);
 		auto gpuInitEnd		   = chrono::steady_clock::now();
 		gpuKeyUploadTime += chrono::duration<double>(gpuInitEnd - gpuInitStart).count();
 
@@ -1147,7 +1147,7 @@ int main(int argc, char* argv[]) {
 		keys.secretKey		   = sk;
 		vector<int> gpuDevices = gpuDeviceList;
 		auto gpuInitStart	   = chrono::steady_clock::now();
-		gpuHelper			   = new GPUHydiaHelper(cc, keys, gpuDevices, batchSize);
+		gpuHelper			   = new GPUFastHESearchHelper(cc, keys, gpuDevices, batchSize);
 		auto gpuInitEnd		   = chrono::steady_clock::now();
 		gpuKeyUploadTime += chrono::duration<double>(gpuInitEnd - gpuInitStart).count();
 
@@ -1336,21 +1336,21 @@ int main(int argc, char* argv[]) {
 	// comparison. Approach 81 (BSGS-Simple-GPU): cache only n1 baby steps.
 	if (gpuHelper != nullptr && (expApproach == ExperimentalApproach::BSGSGPU || expApproach == ExperimentalApproach::BSGSGPUPreRot)) {
 		int nBaby = static_cast<int>(ceil(sqrt(double(VECTOR_DIM))));
-		cout << "[GPUHydiaHelper] Caching " << nBaby << " baby steps on GPU... " << flush;
+		cout << "[GPUFastHESearchHelper] Caching " << nBaby << " baby steps on GPU... " << flush;
 		auto babyStart = chrono::steady_clock::now();
 		gpuHelper->ComputeAndCacheBabyStepsOnGPU(queryCipher[0], nBaby);
 		auto babyEnd	= chrono::steady_clock::now();
 		double babyTime = chrono::duration<double>(babyEnd - babyStart).count();
 		cout << "done (" << fixed << setprecision(4) << babyTime << "s)" << endl;
-		cout << "[GPUHydiaHelper] " << nBaby << " baby steps cached on GPU memory" << endl;
-	} else if (gpuHelper != nullptr && expApproach == ExperimentalApproach::HyDiaGPU) {
-		cout << "[GPUHydiaHelper] Caching " << VECTOR_DIM << " diagonal rotations on GPU... " << flush;
+		cout << "[GPUFastHESearchHelper] " << nBaby << " baby steps cached on GPU memory" << endl;
+	} else if (gpuHelper != nullptr && expApproach == ExperimentalApproach::FastHESearchGPU) {
+		cout << "[GPUFastHESearchHelper] Caching " << VECTOR_DIM << " diagonal rotations on GPU... " << flush;
 		auto babyStart = chrono::steady_clock::now();
 		gpuHelper->ComputeAndCacheBabyStepsOnGPU(queryCipher[0], static_cast<int>(VECTOR_DIM));
 		auto babyEnd	= chrono::steady_clock::now();
 		double babyTime = chrono::duration<double>(babyEnd - babyStart).count();
 		cout << "done (" << fixed << setprecision(4) << babyTime << "s)" << endl;
-		cout << "[GPUHydiaHelper] " << VECTOR_DIM << " rotations cached on GPU memory" << endl;
+		cout << "[GPUFastHESearchHelper] " << VECTOR_DIM << " rotations cached on GPU memory" << endl;
 	}
 #endif
 

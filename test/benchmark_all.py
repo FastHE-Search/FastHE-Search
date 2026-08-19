@@ -13,7 +13,7 @@
 #  SPDX-License-Identifier: MIT
 
 """
-Benchmark script for HyDia - measures timing and resource usage for all approaches.
+Benchmark script for FastHE-Search - measures timing and resource usage for all approaches.
 
 Usage:
     python3 benchmark_all.py [logn] [kmatch]
@@ -91,12 +91,12 @@ BUILD_TYPE_NAMES = {"CPU": "OpenFHE_v1.3.0", "GPU": "OpenFHE_v1.4.2_optimized"}
 
 # Approach full names
 APPROACH_NAMES = {
-    5: "HyDia_CPU",
+    5: "FastHE-Search_CPU",
     6: "BSGS-Orig (CPU)",
     7: "BSGS-Precomp (CPU)",
     8: "BSGS-Precomp-Opt (CPU)",
     9: "BSGS-OnlineAgg (CPU)",
-    51: "HyDia-GPU",
+    51: "FastHE-Search-GPU",
     81: "BSGS-GPU",
     812: "BSGS-GPU-PreRot",
 }
@@ -124,7 +124,7 @@ def parse_approaches(approaches_str):
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="HyDia Benchmark Suite - measures timing and resource usage for all approaches"
+        description="FastHE-Search Benchmark Suite - measures timing and resource usage for all approaches"
     )
     parser.add_argument(
         "logn",
@@ -877,7 +877,7 @@ def main():
         sys.exit(1)
 
     print("\n" + "=" * 70)
-    print("🚀 HyDia Benchmark Suite")
+    print("🚀 FastHE-Search Benchmark Suite")
     print("=" * 70)
 
     # Detect build type

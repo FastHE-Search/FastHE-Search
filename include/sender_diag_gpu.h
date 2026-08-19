@@ -14,10 +14,10 @@
 #include "sender_diag.h"
 
 // Forward declaration
-class GPUHydiaHelper;
+class GPUFastHESearchHelper;
 
 /**
- * HyDia-GPU sender (Approach 51).
+ * FastHE-Search-GPU sender (Approach 51).
  *
  * Ports the legacy GPU diagonal pipeline from improved-hydia with the
  * minimum required integration for light-hydia. Uses GPU helper cache and
@@ -25,7 +25,7 @@ class GPUHydiaHelper;
  */
 class DiagonalSenderGPU : public DiagonalSender {
   public:
-	DiagonalSenderGPU(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam, GPUHydiaHelper* gpuHelper);
+	DiagonalSenderGPU(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam, GPUFastHESearchHelper* gpuHelper);
 
 	~DiagonalSenderGPU();
 
@@ -42,7 +42,7 @@ class DiagonalSenderGPU : public DiagonalSender {
 	bool isGPUReady() const;
 
   private:
-	GPUHydiaHelper* gpuHelper_;
+	GPUFastHESearchHelper* gpuHelper_;
 	bool gpuCacheInitialized_;
 	Ciphertext<DCRTPoly> queryCipherForClone_;
 

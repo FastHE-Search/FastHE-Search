@@ -17,7 +17,7 @@ SPDX-License-Identifier: MIT
 
 ### Artifact – README
 
-FastHE-Search extends the [HyDia](https://github.com/n7koirala/image_matching) framework with a GPU backend featuring optimized CUDA kernels, bringing query latency from many seconds (CPU-only HyDia) to sub-second for certain database sizes. It also introduces Baby-Step Giant-Step (BSGS) matrix-vector products on top of HyDia, reducing VRAM requirements so that the encrypted database can remain resident in GPU memory.
+FastHE-Search extends the [FastHE-Search](https://github.com/n7koirala/image_matching) framework with a GPU backend featuring optimized CUDA kernels, bringing query latency from many seconds (CPU-only FastHE-Search) to sub-second for certain database sizes. It also introduces Baby-Step Giant-Step (BSGS) matrix-vector products on top of FastHE-Search, reducing VRAM requirements so that the encrypted database can remain resident in GPU memory.
 
 This repository contains the full artifact (code + environment) for our paper:
 
@@ -109,7 +109,7 @@ From the repository root, use `./build.sh` to select the build mode:
 ```
 
 - `./build.sh cpu` builds the project in CPU-only mode using the system OpenFHE installation.
-- `./build.sh gpu` builds the project with CUDA/FIDESlib support. If FIDESlib or its patched OpenFHE build is missing, the script builds them automatically before compiling HyDia.
+- `./build.sh gpu` builds the project with CUDA/FIDESlib support. If FIDESlib or its patched OpenFHE build is missing, the script builds them automatically before compiling FastHE-Search.
 - `./build.sh clean` removes the local `build/` contents.
 - `./build.sh clean-all` also removes the FIDESlib build artifacts so the next GPU build is a full rebuild.
 
@@ -166,12 +166,12 @@ The `[APPROACH]` parameter determines which algorithm is used to perform the enc
 | 2         | CPU / GPU  | GROTE Paper |
 | 3         | CPU / GPU  | Blind-Match paper |
 | 4         | CPU / GPU  | HERS paper |
-| 5         | CPU / GPU  | HyDia_CPU (novel diagonal transform) |
+| 5         | CPU / GPU  | FastHE-Search_CPU (novel diagonal transform) |
 | 6         | CPU / GPU  | BSGS-Orig (CPU) |
 | 7         | CPU / GPU  | BSGS-Precomp (CPU) |
 | 8         | CPU / GPU  | BSGS-Precomp-Opt (CPU) |
 | 9         | CPU / GPU  | BSGS-OnlineAgg (CPU) |
-| 51        | GPU build  | HyDia-GPU |
+| 51        | GPU build  | FastHE-Search-GPU |
 | 81        | GPU build  | BSGS-GPU |
 | 812       | GPU build  | BSGS-GPU-PreRot |
 
@@ -339,7 +339,7 @@ The `[APPROACH]` parameter determines which algorithm is used to perform the enc
 | 2         | GROTE Paper |
 | 3         | Blind-Match paper |
 | 4         | HERS paper |
-| 5         | HyDia_CPU (novel diagonal transform) |
+| 5         | FastHE-Search_CPU (novel diagonal transform) |
 | 6         | BSGS-Orig (CPU) |
 | 7         | BSGS-Precomp (CPU) |
 | 8         | BSGS-Precomp-Opt (CPU) |

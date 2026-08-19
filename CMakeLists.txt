@@ -192,7 +192,7 @@ if(USE_GPU)
 
   # Set GPU source files
   set(GPU_SOURCES
-      src/gpu_hydia_helper.cu src/sender/sender_diag_gpu.cpp
+      src/gpu_fasthe_search_helper.cu src/sender/sender_diag_gpu.cpp
       src/sender/sender_diag_bsgs_simple_gpu.cpp
       src/sender/sender_diag_bsgs_simple_gpu_prerot.cpp)
 

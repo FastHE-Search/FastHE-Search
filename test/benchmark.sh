@@ -13,7 +13,7 @@
 #  SPDX-License-Identifier: MIT
 
 
-# Benchmark script for HyDia - runs benchmarks for CPU and/or GPU builds
+# Benchmark script for FastHE-Search - runs benchmarks for CPU and/or GPU builds
 #
 # Usage:
 #   ./benchmark.sh both logn=[10,12,14] kmatch=[16,32,32]
@@ -182,12 +182,12 @@ for arg in "$@"; do
             echo "  gpus=0,1,...               Explicit GPU device list for multi-GPU sharding"
             echo ""
             echo "Available approaches:"
-            echo "  5   - HyDia_CPU (baseline)"
+            echo "  5   - FastHE-Search_CPU (baseline)"
             echo "  6   - BSGS-Orig (CPU)"
             echo "  7   - BSGS-Precomp (CPU)"
             echo "  8   - BSGS-Precomp-Opt (CPU)"
             echo "  9   - BSGS-OnlineAgg (CPU)"
-            echo "  51  - HyDia-GPU (GPU build only)"
+            echo "  51  - FastHE-Search-GPU (GPU build only)"
             echo "  81  - BSGS-GPU (GPU build only)"
             echo "  812 - BSGS-GPU-PreRot (GPU build only)"
             echo ""
@@ -221,7 +221,7 @@ mkdir -p "$OUTPUT_DIR"
 mkdir -p "$TEST_DATA_DIR"
 
 echo -e "${BLUE}======================================${NC}"
-echo -e "${BLUE}HyDia Benchmark Suite${NC}"
+echo -e "${BLUE}FastHE-Search Benchmark Suite${NC}"
 echo -e "${BLUE}======================================${NC}"
 echo -e "${BLUE}Build directory: ${BUILD_DIR}${NC}"
 echo -e "${BLUE}Test data directory: ${TEST_DATA_DIR}${NC}"

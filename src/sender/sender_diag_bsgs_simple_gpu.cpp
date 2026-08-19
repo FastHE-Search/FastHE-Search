@@ -19,7 +19,7 @@
 // 4. Download aggregated membership result or per-matrix index results
 
 #include "../../include/sender_diag_bsgs_simple_gpu.h"
-#include "../../include/gpu_hydia_helper.cuh"
+#include "../../include/gpu_fasthe_search_helper.cuh"
 #include <chrono>
 #include <cmath>
 #include <iomanip>
@@ -28,7 +28,7 @@ using namespace std;
 
 // -------------------- CONSTRUCTOR --------------------
 
-DiagonalBSGSSimpleSenderGPU::DiagonalBSGSSimpleSenderGPU(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam, GPUHydiaHelper* gpuHelper)
+DiagonalBSGSSimpleSenderGPU::DiagonalBSGSSimpleSenderGPU(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam, GPUFastHESearchHelper* gpuHelper)
 : DiagonalBSGSSimpleSender(ccParam, pkParam, vectorParam), gpuHelper_(gpuHelper), gpuCacheInitialized_(false), rotationsCached_(false) {
 	if (gpuHelper_ && gpuHelper_->isReady()) {
 		cout << "[Approach 81] GPU Simple BSGS Sender initialized:" << endl;

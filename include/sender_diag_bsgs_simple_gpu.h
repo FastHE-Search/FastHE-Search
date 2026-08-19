@@ -24,12 +24,12 @@
 #include "sender_diag_bsgs_simple.h"
 
 // Forward declaration
-class GPUHydiaHelper;
+class GPUFastHESearchHelper;
 
 class DiagonalBSGSSimpleSenderGPU : public DiagonalBSGSSimpleSender {
   public:
 	// Constructor (no sk param - light-hydia's DiagonalSender doesn't take it)
-	DiagonalBSGSSimpleSenderGPU(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam, GPUHydiaHelper* gpuHelper);
+	DiagonalBSGSSimpleSenderGPU(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam, GPUFastHESearchHelper* gpuHelper);
 
 	// Destructor
 	~DiagonalBSGSSimpleSenderGPU();
@@ -53,7 +53,7 @@ class DiagonalBSGSSimpleSenderGPU : public DiagonalBSGSSimpleSender {
 	bool isGPUReady() const;
 
   protected:
-	GPUHydiaHelper* gpuHelper_;
+	GPUFastHESearchHelper* gpuHelper_;
 	bool gpuCacheInitialized_;
 	bool rotationsCached_;
 	Ciphertext<DCRTPoly> queryCipherForClone_;

@@ -27,7 +27,7 @@
 
 class DiagonalBSGSSimpleSenderGPU812 : public DiagonalBSGSSimpleSenderGPU {
   public:
-	DiagonalBSGSSimpleSenderGPU812(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam, GPUHydiaHelper* gpuHelper);
+	DiagonalBSGSSimpleSenderGPU812(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam, GPUFastHESearchHelper* gpuHelper);
 
 	/// Initialize GPU cache using pre-rotated diagonals loaded from files (bulk mode)
 	void initializeGPUCache();
