@@ -91,12 +91,12 @@ BUILD_TYPE_NAMES = {"CPU": "OpenFHE_v1.3.0", "GPU": "OpenFHE_v1.4.2_optimized"}
 
 # Approach full names
 APPROACH_NAMES = {
-    5: "FastHE-Search_CPU",
+    5: "HyDia_CPU",
     6: "BSGS-Orig (CPU)",
     7: "BSGS-Precomp (CPU)",
     8: "BSGS-Precomp-Opt (CPU)",
     9: "BSGS-OnlineAgg (CPU)",
-    51: "FastHE-Search-GPU",
+    51: "HyDia-GPU",
     81: "BSGS-GPU",
     812: "BSGS-GPU-PreRot",
 }

@@ -358,7 +358,7 @@ build_gpu() {
 
     echo -e "${GREEN}✓ GPU build complete!${NC}"
     echo -e "${GREEN}OpenFHE Version: 1.4.2 (FIDESlib-patched, -O3 -march=native)${NC}"
-    echo -e "${GREEN}Supported approaches: 1-11, 51, 81 (51 FastHE-Search-GPU, 81 BSGS-GPU, 812 BSGS-GPU-PreRot)${NC}"
+    echo -e "${GREEN}Supported approaches: 1-11, 51, 81 (51 HyDia-GPU, 81 BSGS-GPU, 812 BSGS-GPU-PreRot)${NC}"
     echo ""
     echo "Run with: ./run_fasthe_search.sh test/test_1024_k10.dat 9 11 45"
 }
