@@ -78,7 +78,7 @@ size_t OpenFHEWrapper::computeRequiredDepth(size_t approach) {
 		// standard comparator at COMP_DEPTH = 8.
 		break;
 
-	case 51:					 // FastHE-Search-GPU (port of legacy approach 9 GPU diagonal pipeline)
+	case 51:					 // HyDia-GPU (port of legacy approach 9 GPU diagonal pipeline)
 		depth += 1;				 // one mult required for score computation
 		depth += 2;				 // extra headroom for GPU rescale/relinearization pipeline
 		depth += COMP_DEPTH_GPU; // GPU comparison depth (total = 1 + 2 + 8 = 11)

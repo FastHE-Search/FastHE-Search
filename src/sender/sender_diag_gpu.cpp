@@ -20,7 +20,7 @@ using namespace std;
 DiagonalSenderGPU::DiagonalSenderGPU(CryptoContext<DCRTPoly> ccParam, PublicKey<DCRTPoly> pkParam, size_t vectorParam, GPUFastHESearchHelper* gpuHelper)
 : DiagonalSender(ccParam, pkParam, vectorParam), gpuHelper_(gpuHelper), gpuCacheInitialized_(false) {
 	if (gpuHelper_ && gpuHelper_->isReady()) {
-		cout << "[Approach 51] FastHE-Search-GPU sender initialized" << endl;
+		cout << "[Approach 51] HyDia-GPU sender initialized" << endl;
 	} else {
 		cerr << "[Approach 51] WARNING: GPU helper not ready, will fall back to CPU" << endl;
 	}
@@ -148,7 +148,7 @@ void DiagonalSenderGPU::streamDiagonalsFromDisk(const string& serialDir) {
 }
 
 Ciphertext<DCRTPoly> DiagonalSenderGPU::membershipScenario(vector<Ciphertext<DCRTPoly>>& queryCipher) {
-	cout << "[Approach 51] Running FastHE-Search-GPU membership scenario..." << endl;
+	cout << "[Approach 51] Running HyDia-GPU membership scenario..." << endl;
 
 	if (!isGPUReady() || !gpuHelper_->areDiagonalsCached()) {
 		cout << "[Approach 51] GPU not ready, falling back to CPU" << endl;
@@ -177,7 +177,7 @@ Ciphertext<DCRTPoly> DiagonalSenderGPU::membershipScenario(vector<Ciphertext<DCR
 }
 
 vector<Ciphertext<DCRTPoly>> DiagonalSenderGPU::indexScenario(vector<Ciphertext<DCRTPoly>>& queryCipher) {
-	cout << "[Approach 51] Running FastHE-Search-GPU index scenario..." << endl;
+	cout << "[Approach 51] Running HyDia-GPU index scenario..." << endl;
 
 	if (!isGPUReady() || !gpuHelper_->areDiagonalsCached()) {
 		cout << "[Approach 51] GPU not ready, falling back to CPU" << endl;

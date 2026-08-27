@@ -166,12 +166,12 @@ The `[APPROACH]` parameter determines which algorithm is used to perform the enc
 | 2         | CPU / GPU  | GROTE Paper |
 | 3         | CPU / GPU  | Blind-Match paper |
 | 4         | CPU / GPU  | HERS paper |
-| 5         | CPU / GPU  | FastHE-Search_CPU (novel diagonal transform) |
+| 5         | CPU / GPU  | HyDia_CPU (novel diagonal transform) |
 | 6         | CPU / GPU  | BSGS-Orig (CPU) |
 | 7         | CPU / GPU  | BSGS-Precomp (CPU) |
 | 8         | CPU / GPU  | BSGS-Precomp-Opt (CPU) |
 | 9         | CPU / GPU  | BSGS-OnlineAgg (CPU) |
-| 51        | GPU build  | FastHE-Search-GPU |
+| 51        | GPU build  | HyDia-GPU |
 | 81        | GPU build  | BSGS-GPU |
 | 812       | GPU build  | BSGS-GPU-PreRot |
 
@@ -339,7 +339,7 @@ The `[APPROACH]` parameter determines which algorithm is used to perform the enc
 | 2         | GROTE Paper |
 | 3         | Blind-Match paper |
 | 4         | HERS paper |
-| 5         | FastHE-Search_CPU (novel diagonal transform) |
+| 5         | HyDia_CPU (novel diagonal transform) |
 | 6         | BSGS-Orig (CPU) |
 | 7         | BSGS-Precomp (CPU) |
 | 8         | BSGS-Precomp-Opt (CPU) |

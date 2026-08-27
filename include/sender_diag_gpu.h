@@ -17,7 +17,7 @@
 class GPUFastHESearchHelper;
 
 /**
- * FastHE-Search-GPU sender (Approach 51).
+ * HyDia-GPU sender (Approach 51).
  *
  * Ports the legacy GPU diagonal pipeline from improved-hydia with the
  * minimum required integration for light-hydia. Uses GPU helper cache and
