@@ -195,7 +195,7 @@ int main(int argc, char* argv[]) {
 		cerr << "    2 = GROTE" << endl;
 		cerr << "    3 = Blind-Match" << endl;
 		cerr << "    4 = HERS" << endl;
-		cerr << "    5 = FastHE-Search diagonal (CPU)" << endl;
+		cerr << "    5 = HyDia diagonal (CPU)" << endl;
 		cerr << "    6 = BSGS-Orig (CPU)" << endl;
 		cerr << "    7 = BSGS-Precomp (CPU)" << endl;
 		cerr << "    8 = BSGS-Precomp-Opt (CPU)" << endl;
