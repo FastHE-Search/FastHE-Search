@@ -36,9 +36,9 @@ echo "Technique 4: HERS approach"
 echo "HERS approach test completed."
 
 echo ""
-echo "Technique 5: FastHE-Search (ours) approach"
-./ImageMatching ../test/2_10.dat 5  # FastHE-Search approach
-echo "FastHE-Search (ours) approach test completed."
+echo "Technique 5: HyDia (ours) approach"
+./ImageMatching ../test/2_10.dat 5  # HyDia approach
+echo "HyDia (ours) approach test completed."
 
 # ./ImageMatchingAccuracy 0 5         # Accuracy experiment   
 
